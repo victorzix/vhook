@@ -25,8 +25,9 @@ internal/delivery/   service + repo (consumido pelo worker)
 internal/queue/      porta + adapter Rabbit
 internal/dispatch/   cliente HTTP, HMAC, guard de SSRF, timeout
 internal/store/      sqlc gerado, pool, advisory locks
+internal/ids/        UUIDv7 ↔ prefixo_base32
 internal/errs/       registro de erros: código, nível, status
-internal/obs/        slog e métricas
+internal/obs/        slog, métricas e handlers de health
 contracts/           openapi.yaml + events/*.schema.json (fonte única)
 i18n/                errors.{pt-BR,en,es,fr}.json — catálogo compartilhado Go + front
 migrations/

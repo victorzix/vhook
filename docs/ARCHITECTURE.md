@@ -130,7 +130,7 @@ applications        id, org_id, name, api_key_hash, plan, backoff_profile,
                     locale
 endpoints           id, application_id, url, secret_encrypted, status,
                     consecutive_failures, disabled_at
-events              id, application_id, event_type, payload jsonb,
+events              id, application_id, event_type, payload text,
                     idempotency_key, received_at
                     UNIQUE (application_id, idempotency_key)
 deliveries          id, event_id, endpoint_id, status, attempt_count,
@@ -387,12 +387,15 @@ vhook/
 ├── cmd/{api,worker,reconciler,sink}/main.go
 ├── internal/
 │   ├── core/       domínio puro: política de backoff, classificação de falha
-│   ├── store/      Postgres via sqlc
+│   ├── ingress/    handler + service
+│   ├── endpoints/  handler + service + repo
+│   ├── delivery/   service + repo (consumido pelo worker)
 │   ├── queue/      porta + adapter Rabbit  ← isola o degrau 4 (§5)
 │   ├── dispatch/   cliente HTTP, HMAC, guard de SSRF, timeout
-│   ├── httpapi/    handlers de ingress e management
+│   ├── store/      Postgres via sqlc
+│   ├── ids/        UUIDv7 ↔ prefixo_base32 (§4.31)
 │   ├── errs/       registro de erros: código, nível, status HTTP
-│   └── obs/        slog e métricas
+│   └── obs/        slog, métricas e handlers de health
 ├── contracts/      openapi.yaml + events/*.schema.json (fonte única)
 ├── i18n/           errors.<locale>.json — catálogo compartilhado Go + dashboard
 ├── migrations/
@@ -492,6 +495,47 @@ Gerar os tipos nos dois lados é o que torna drift entre front e back impossíve
 **Tradeoff.** Toda mudança de superfície passa a exigir editar YAML, regenerar e commitar o gerado — atrito real em mudança pequena. E ferramenta de codegen tem opiniões: o formato dos tipos produzidos não é o que se escreveria à mão, o que às vezes obriga a adaptar o contrato ao gerador em vez do contrário.
 
 **Descartado.** Contrato em markdown descritivo: rápido de escrever, mas nada valida e nada gera, então ele diverge do código em silêncio — e contrato em que se confia estando errado é pior que contrato nenhum. Contrato dentro da pasta de cada spec: `/v1/endpoints` não pertence a uma feature, então a definição da API ficaria espalhada em N pastas, cada uma congelada no dia em que foi escrita. Snapshot por spec junto do contrato vivo: a cópia desatualizada conviveria com a atual e alguém leria a errada — o histórico do git já preserva a intenção original.
+
+### 4.31 Identificadores: UUIDv7 no banco, prefixo e base32 na borda
+
+**Decisão.** Toda chave primária é `uuid` no Postgres, com valor UUIDv7 **gerado na aplicação**, sem `DEFAULT` no banco. A forma externa é `prefixo_base32`: os mesmos 128 bits em base32 Crockford, precedidos de um prefixo de três letras por recurso.
+
+```
+banco    018f4c2a-7b31-7c4e-9a2b-1f5c8d3e6b04
+API      evt_01HQZX3K7YB2N4M8P6R9T5V0W1
+
+org_  app_  ept_  evt_  dlv_  att_
+```
+
+**Por quê.** A escolha real não é entre bibliotecas de ID, é entre *ordenável por tempo* e *aleatório* — e essa decide desempenho de escrita. `delivery_attempts` é a tabela de maior taxa de inserção do sistema; com chave aleatória (UUIDv4, CUID2) cada insert cai num ponto arbitrário do índice B-tree, causando divisão de página, inchaço de índice e WAL maior. Com chave ordenada por tempo os inserts acumulam à direita da árvore. UUIDv7 e ULID têm exatamente o mesmo desenho aqui — 48 bits de timestamp em milissegundos mais aleatoriedade — e ambos resolvem isso.
+
+Entre os dois, UUIDv7 por ser **norma**: RFC 9562, de maio de 2024, que obsoletou a RFC 4122, com tipo nativo de 16 bytes no Postgres. ULID é convenção comunitária de manutenção leve; funciona, mas não tem o mesmo respaldo nem tipo nativo.
+
+O prefixo existe para uma classe de bug específica: um `delivery_id` colado onde se espera um `endpoint_id` deixa de ser um 404 confuso e passa a ser erro de validação nomeado. E como base32 Crockford dos 128 bits de um UUIDv7 produz a mesma string de 26 caracteres que um ULID produziria, a forma externa é curta e legível sem que o banco deixe de guardar um `uuid` nativo.
+
+O ID é gerado em Go, não pelo banco, porque o ingress precisa dele **antes** do insert: a linha de `deliveries` é escrita e o `delivery_id` é publicado na fila (§4.6).
+
+**Tradeoff.** Existe um encoder e um decoder entre o banco e a borda, com teste de round-trip para prová-los. Pior: o `psql` mostra o UUID cru, então investigar um `evt_01HQ…` relatado exige decodificar. A mitigação é uma função SQL `vhook_id(text) → uuid` criada por migration, mais um teste de integração que roda os **mesmos vetores fixos** contra a implementação Go e a SQL — sem esse teste, ter o encoding escrito duas vezes seria fonte garantida de divergência.
+
+**Ressalva registrada sobre imprevisibilidade.** Nem UUIDv7 nem ULID são imprevisíveis: os dois vazam o instante de criação, e o modo monotônico do ULID chega a produzir IDs consecutivos dentro do mesmo milissegundo. Isso não é problema aqui porque **o ID não é credencial** — a API é autenticada por Bearer e o escopo é por `application_id`, então adivinhar um `delivery_id` não dá acesso a nada. O que precisa ser imprevisível é `applications.api_key_hash` e `endpoints.secret`, e esses são `crypto/rand` (§4.12). Num sistema onde o ID fosse a única proteção de uma URL pública, a escolha teria de ser outra.
+
+**Descartado.** UUIDv4: 122 bits aleatórios, o mais imprevisível, mas paga o custo de índice acima para comprar uma propriedade que este sistema não usa. CUID2: abriu mão da ordenação **de propósito**, em nome da imprevisibilidade — mesma troca ruim para nós, e ainda é ecossistema JavaScript com porte Go de terceiro. ULID guardado em coluna `text`: seria o que aparece na API idêntico ao que aparece no `psql`, mas 30 bytes por chave, sem tipo nativo, e apoiado em spec comunitária. UUID canônico sem base32 na borda (`evt_018f4c2a-…`): dispensaria encoder e decoder inteiros, e foi recusado por estética da superfície pública — é o descarte menos confortável desta seção, e a função `vhook_id` existe justamente para pagar a conta dele.
+
+### 4.32 `events.payload` é `text` byte-exato, não `jsonb`
+
+**Decisão.** A coluna guarda os bytes crus recebidos no ingress, como `text` nullable. Não `jsonb`.
+
+**Por quê.** `jsonb` não guarda bytes, guarda uma árvore analisada: reordena chaves, descarta duplicatas e re-renderiza na leitura. O que sai do banco não é byte a byte o que entrou.
+
+Isso mataria a assinatura. O HMAC é sobre `"{timestamp}.{raw_body}"` (§4.7), e §4.7 diz explicitamente que o payload trafega como `[]byte` do ingress até o POST porque desserializar e re-serializar quebraria a verificação do cliente de forma intermitente. Guardar em `jsonb` faria exatamente isso, só que dentro do banco em vez de dentro do código — e ainda mais difícil de enxergar, porque a coluna teria o tipo que "parece certo".
+
+`text` preserva os bytes e mantém `payload::jsonb` disponível para consulta ad-hoc. O Postgres valida UTF-8 na coluna, o que é desejável — JSON é UTF-8 por definição — mas move a rejeição de bytes malformados para o insert; o ingress valida antes.
+
+Nullable porque `NULL` é o estado de payload expurgado pela retenção de 30 dias (§4.27). Não há coluna extra marcando o expurgo: `received_at` já diz quando o evento chegou.
+
+**Tradeoff.** Perde-se indexação por conteúdo do payload — nada de índice GIN sobre um campo interno. Não é perda real: o vhook nunca consulta por dentro do payload, ele é opaco por definição. Se um dia fosse preciso, o caminho é uma coluna gerada com o campo específico extraído, não trocar o tipo da coluna.
+
+**Descartado.** `bytea`: igualmente byte-exato e mais honesto sobre ser opaco, mas aparece como hex no `psql` e mata a leitura manual do payload numa investigação — que é o uso mais frequente da coluna. `jsonb` mais `payload_raw bytea`: consulta rica e assinatura correta, ao custo de guardar o mesmo dado duas vezes, dobrando a tabela mais volumosa e criando duas fontes que podem divergir.
 
 ---
 

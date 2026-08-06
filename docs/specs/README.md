@@ -44,7 +44,7 @@ Domínio novo se cria quando aparece a segunda spec que não cabe em nenhum exis
 
 | # | Domínio | Spec | Release | Status |
 |---|---|---|---|---|
-| — | — | *nenhuma spec ainda* | — | — |
+| 001 | `platform` | [Walking skeleton](platform/001-walking-skeleton/spec.md) | `v0.1.0` | em revisão |
 
 Uma spec só está aprovada quando entra nesta tabela. É a única visão que mostra ordem, release e status juntos — as pastas mostram agrupamento, não progresso.
 

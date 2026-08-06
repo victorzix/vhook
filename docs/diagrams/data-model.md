@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Decisões que explicam esta forma: [`ARCHITECTURE.md` §4.5](../ARCHITECTURE.md) (modelagem em três níveis) e §4.14 (multi-tenancy).
+Decisões que explicam esta forma: [`ARCHITECTURE.md` §4.5](../ARCHITECTURE.md) (modelagem em três níveis), §4.14 (multi-tenancy), §4.31 (identificadores) e §4.32 (payload byte-exato).
 
 ```mermaid
 erDiagram
@@ -43,7 +43,7 @@ erDiagram
         uuid id PK
         uuid application_id FK
         text event_type
-        jsonb payload "anulado após 30 dias"
+        text payload "bytes crus, byte-exato; NULL = expurgado após 30 dias"
         text idempotency_key "UNIQUE com application_id"
         timestamptz received_at
     }
@@ -80,3 +80,20 @@ erDiagram
 **Duas credenciais guardadas de formas diferentes.** `api_key_hash` é hasheada porque só se verifica se bate; `secret_encrypted` é cifrada porque o vhook precisa do valor em claro para calcular o HMAC. Não é inconsistência — é a diferença entre verificar e usar.
 
 **`delivery_attempts` é a tabela que cresce mais rápido.** Retenção de 30 dias, e o degrau de particionamento por mês está em §4.27.
+
+**Todo `id` é UUIDv7 gerado na aplicação, não pelo banco.** O ingress precisa do `delivery_id` antes do insert, porque é ele que vai para a fila (§4.6). Na API o mesmo valor aparece como `evt_01HQZX…` — prefixo por recurso mais base32 dos mesmos 128 bits (§4.31). No `psql`, `vhook_id('evt_01HQZX…')` faz o caminho de volta.
+
+**`payload` é `text`, e isso não é descuido.** `jsonb` reordena chaves e re-renderiza na leitura, o que quebraria o HMAC calculado sobre os bytes crus (§4.7). O tipo que "parece certo" é o que estragaria a assinatura (§4.32).
+
+## Índices que existem desde a primeira migration
+
+| Tabela | Índice | Para quê |
+|---|---|---|
+| `applications` | `UNIQUE (api_key_hash)` | autenticação do ingress |
+| `endpoints` | `(application_id)` | listagem por application |
+| `events` | `UNIQUE (application_id, idempotency_key)` | idempotência (§4.13) |
+| `deliveries` | `(created_at, id)` | paginação keyset (§4.21) |
+| `deliveries` | `(status, next_attempt_at)` | varredura do reconciliador (§4.20) |
+| `delivery_attempts` | `UNIQUE (delivery_id, attempt_number)` | uma linha por tentativa |
+
+Nascem todos juntos porque criá-los depois, sobre tabela já em uso, exigiria `CREATE INDEX CONCURRENTLY` — e essa é uma complicação que a spec de ingress teria de resolver sem que ela tenha nada a ver com ingress.
