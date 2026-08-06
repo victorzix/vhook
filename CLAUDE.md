@@ -89,6 +89,7 @@ Os contratos entram **antes** da aprovação, não depois: é aprovando a spec q
 - Cada spec vira uma release demonstrável. Se não dá para demonstrar sozinha, está grande demais — quebre.
 - Skill `writing-plans` define o formato do plano. Não copiar a estrutura dela para outro lugar.
 - Decisão que vale para todo o sistema vai para `docs/ARCHITECTURE.md` no formato de `_template_/architecture-decision.md`, nunca escondida dentro de uma spec de feature.
+- Spec que altera schema ou fluxo **atualiza [`docs/diagrams/`](docs/diagrams/README.md) no mesmo commit**. Mermaid em markdown, nunca imagem exportada. Um conceito tem um diagrama só — antes de criar, procure se já existe.
 
 **Nenhum placeholder em spec ou plano.** `TBD`, `a definir`, `tratar erros adequadamente` são falhas de documento. Implementar em cima de spec vaga produz a decisão por omissão, tomada por quem tem menos contexto.
 
