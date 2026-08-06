@@ -1,0 +1,123 @@
+openapi: 3.1.0
+
+info:
+  title: vhook
+  version: 0.0.0
+  description: |
+    Webhook dispatcher. Duas superfícies com autenticação distinta:
+
+    - **Ingress** — pública, chamada por produtores, autenticada por chave da application.
+    - **Management** — interna, consumida pelo dashboard, autenticada por token administrativo.
+
+    Erros nunca carregam mensagem: só código, `correlation_id` e `details`.
+    O consumidor traduz o código pelo catálogo. Ver `docs/ERRORS.md`.
+
+servers:
+  - url: http://localhost:8080/v1
+    description: desenvolvimento
+
+# As operações são adicionadas pela spec que as introduz.
+paths: {}
+
+components:
+  securitySchemes:
+    ApplicationApiKey:
+      type: http
+      scheme: bearer
+      description: Chave da application. Usada apenas no ingress.
+
+    AdminToken:
+      type: http
+      scheme: bearer
+      description: |
+        Token administrativo. Usado apenas no management, e apenas
+        server-side pelo BFF do dashboard — nunca chega ao browser.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: |
+        Reenvio com a mesma chave na mesma application não cria evento novo:
+        responde 202 com o `event_id` existente.
+
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: |
+        Paginação keyset sobre `(created_at, id)`. Opaco para o cliente.
+
+  schemas:
+    ErrorCode:
+      type: string
+      pattern: '^[A-Z]{3}-[A-Z]{3}-[0-9]{3}$'
+      examples:
+        - AUT-CRD-001
+      description: |
+        `MOD-TYP-NNN`. Contrato estável — pode ser usado em lógica de decisão.
+        Ver `docs/ERRORS.md` para a taxonomia.
+
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, correlation_id]
+          additionalProperties: false
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            correlation_id:
+              type: string
+              description: |
+                Liga esta resposta ao log estruturado. Obrigatório: como não
+                há mensagem, é a única forma de investigar um caso relatado.
+              examples:
+                - 01HQZX3K7YB2N4M8P6R9T5V0W1
+            details:
+              type: array
+              description: |
+                Falhas por campo, para o dashboard destacar o formulário sem
+                que o backend produza texto. Ausente quando não se aplica.
+              items:
+                type: object
+                required: [field, code]
+                additionalProperties: false
+                properties:
+                  field:
+                    type: string
+                    examples:
+                      - url
+                  code:
+                    $ref: '#/components/schemas/ErrorCode'
+
+  responses:
+    Unauthorized:
+      description: Credencial ausente ou inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    UnprocessableEntity:
+      description: Conteúdo bem-formado, mas inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Limite de rate ou quota do plano excedido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
