@@ -2,7 +2,9 @@
 
 Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadastrados, com assinatura HMAC, timeout agressivo, retry com backoff exponencial e DLQ.
 
-**Estado: design fechado, nenhum código escrito.** O próximo passo é o plano de implementação.
+**Estado: design fechado, nenhum código escrito.** O próximo passo é a **primeira spec** — e ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
+
+Pendente, em ordem: primeira spec · `docker-compose.yml` e `Makefile` · CD no Coolify apontando para o repo · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
 
 **Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 30 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
 
@@ -136,6 +138,16 @@ Nunca encerrar uma tarefa com teste vermelho.
 - **Nomes de arquivo e de pasta sempre em inglês**, mesmo quando o conteúdo é em português. Exceção só para termo de domínio que não tem tradução honesta (`inscricao-municipal`, `nota-fiscal`) — traduzir esses inventa um conceito que não existe.
 - **Conteúdo de documentação e mensagens de commit em português.** Código, identificadores, comentários e logs em inglês.
 - Ao tomar uma decisão de arquitetura nova, registrar em `docs/ARCHITECTURE.md` no formato de `docs/specs/_template_/architecture-decision.md`.
+
+## Documentação visual
+
+`docs/overview.html` é publicado como Artifact em quatro páginas navegáveis:
+
+**https://claude.ai/code/artifact/ae67af0a-46ef-46a7-9250-2cda03fefc22**
+
+Para atualizar, **republique passando essa URL** — sem ela, uma conversa nova cria um endereço diferente em vez de atualizar o existente. O estilo mora em `docs/pages/_style.css` e é injetado inline por `bash docs/pages/build.sh`; editar o CSS dentro do HTML é editar a cópia.
+
+É visão derivada: a fonte é `docs/diagrams/` e `docs/ARCHITECTURE.md`.
 
 ## CI
 

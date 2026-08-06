@@ -6,6 +6,10 @@
 # rode isto, em vez de editar o mesmo bloco em N arquivos.
 #
 # Uso: bash docs/pages/build.sh
+#
+# Depois de rodar, republique o Artifact SEMPRE passando a URL existente:
+#   https://claude.ai/code/artifact/ae67af0a-46ef-46a7-9250-2cda03fefc22
+# Sem a URL, uma conversa nova cria um endereço novo em vez de atualizar.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
