@@ -1,0 +1,16 @@
+# Normaliza para LF no repositório, independente do sistema de quem commita.
+# Sem isso, quem desenvolve no Windows commita CRLF e o CI em Linux vê o
+# arquivo inteiro como alterado.
+* text=auto eol=lf
+
+# Binários nunca são convertidos.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+
+# Código gerado: colapsa no diff do GitHub e não conta como código do autor.
+# O contrato é a fonte; o gerado é saída.
+*.gen.go linguist-generated=true
+*_gen.go linguist-generated=true
+apps/dashboard/src/api/schema.d.ts linguist-generated=true
