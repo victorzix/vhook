@@ -137,6 +137,14 @@ Nunca encerrar uma tarefa com teste vermelho.
 - **Conteúdo de documentação e mensagens de commit em português.** Código, identificadores, comentários e logs em inglês.
 - Ao tomar uma decisão de arquitetura nova, registrar em `docs/ARCHITECTURE.md` no formato de `docs/specs/_template_/architecture-decision.md`.
 
+## CI
+
+- `.github/workflows/ci.yml` — contratos, Go e front. **Cada job pergunta se o que ele testa já existe** (`go.mod`, `pnpm-workspace.yaml`) e sai limpo quando não: CI vermelho por ausência ensina a ignorar CI vermelho.
+- `.github/workflows/release.yml` — release-please mantém um PR de release aberto; a versão só é cortada no merge dele. Depois disso, anuncia a release pelo próprio ingress do vhook, ou não faz nada se os secrets não existirem.
+- O job de Go falha se o **código gerado dos contratos estiver atrasado**. Não regenerar deixa de ser bug de runtime e passa a ser PR vermelho.
+
+Secrets usados pelo release, ambos opcionais: `VHOOK_INGRESS_URL` e `VHOOK_INGRESS_API_KEY`.
+
 ## Comandos
 
-Nada ainda. Preencher quando o `Makefile` e o `docker-compose.yml` existirem.
+Nada ainda. Preencher quando o `Makefile` e o `docker-compose.yml` existirem — o CI espera um alvo `generate` no Makefile para checar o código gerado.

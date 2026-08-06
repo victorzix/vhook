@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Mantém um PR de release aberto com o CHANGELOG e a versão bumpados.
+      # A release só é cortada quando esse PR é mergeado.
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # A partir daqui, só quando uma release foi realmente criada.
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.release_created
+
+      # O vhook anuncia as próprias releases usando o vhook. Enquanto os
+      # secrets não existirem, o passo não faz nada — a release acontece,
+      # o CHANGELOG cresce, e o backfill publica as tags antigas depois.
+      - name: Anunciar release pelo próprio vhook
+        if: steps.release.outputs.release_created
+        env:
+          INGRESS_URL: ${{ secrets.VHOOK_INGRESS_URL }}
+          INGRESS_KEY: ${{ secrets.VHOOK_INGRESS_API_KEY }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+          NOTES: ${{ steps.release.outputs.body }}
+        run: |
+          if [ -z "$INGRESS_URL" ] || [ -z "$INGRESS_KEY" ]; then
+            echo "ingress do vhook ainda não configurado — nada a anunciar"
+            exit 0
+          fi
+
+          payload=$(jq -n \
+            --arg tag "$TAG" \
+            --arg version "$VERSION" \
+            --arg notes "$NOTES" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
+            '{
+              event_type: "release.published",
+              payload: {
+                tag: $tag,
+                version: $version,
+                notes: $notes,
+                repository: $repo,
+                url: $url
+              }
+            }')
+
+          # Idempotency-Key pela tag: rodar duas vezes não duplica nada, e é
+          # o mesmo mecanismo que torna o backfill das tags antigas seguro.
+          curl --fail-with-body --silent --show-error \
+            --request POST "$INGRESS_URL/v1/events" \
+            --header "Authorization: Bearer $INGRESS_KEY" \
+            --header "Idempotency-Key: release-$TAG" \
+            --header "Content-Type: application/json" \
+            --data "$payload"

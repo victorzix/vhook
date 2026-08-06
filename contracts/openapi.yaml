@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: vhook
-  version: 0.0.0
+  version: 0.0.0 # x-release-please-version
   description: |
     Webhook dispatcher. Duas superfícies com autenticação distinta:
 

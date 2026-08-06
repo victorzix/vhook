@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "go",
+  "include-component-in-tag": false,
+  "separate-pull-requests": false,
+  "packages": {
+    ".": {
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["contracts/openapi.yaml"]
+    }
+  },
+  "changelog-sections": [
+    { "type": "feat", "section": "Funcionalidades" },
+    { "type": "fix", "section": "Correções" },
+    { "type": "perf", "section": "Desempenho" },
+    { "type": "refactor", "section": "Refatoração" },
+    { "type": "docs", "section": "Documentação" },
+    { "type": "test", "section": "Testes", "hidden": true },
+    { "type": "chore", "section": "Manutenção", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true }
+  ]
+}

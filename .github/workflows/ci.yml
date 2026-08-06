@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# PR com vários pushes seguidos cancela as execuções superadas.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # O repositório ainda não tem código. Em vez de falhar em tudo até existir,
+  # cada job pergunta se o que ele testa já nasceu. CI vermelho por ausência
+  # ensina a ignorar CI vermelho.
+  detect:
+    name: O que existe
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+      front: ${{ steps.check.outputs.front }}
+      contracts: ${{ steps.check.outputs.contracts }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        run: |
+          exists() { [ -e "$1" ] && echo true || echo false; }
+          {
+            echo "go=$(exists go.mod)"
+            echo "front=$(exists pnpm-workspace.yaml)"
+            echo "contracts=$(exists contracts/openapi.yaml)"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  contracts:
+    name: Contratos
+    needs: detect
+    if: needs.detect.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar OpenAPI
+        run: npx --yes @redocly/cli@latest lint contracts/openapi.yaml --extends=minimal
+
+      - name: Validar schemas de evento
+        run: |
+          shopt -s nullglob
+          files=(contracts/events/*.schema.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "nenhum schema de evento ainda"
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+            echo "ok $f"
+          done
+
+  go:
+    name: Go
+    needs: detect
+    if: needs.detect.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verificar formatação
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "arquivos não formatados:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      # Contrato é a fonte: se o gerado estiver atrasado, o PR falha aqui e
+      # não em runtime, três semanas depois, com front e back divergindo.
+      - name: Código gerado está em dia
+        run: |
+          if [ ! -f Makefile ] || ! grep -q '^generate:' Makefile; then
+            echo "sem alvo generate ainda"
+            exit 0
+          fi
+          make generate
+          git diff --exit-code || {
+            echo "código gerado está desatualizado — rode 'make generate' e commite"
+            exit 1
+          }
+
+      # testcontainers sobe Postgres e RabbitMQ reais; o runner já tem Docker.
+      - name: Testes
+        run: go test -race -shuffle=on ./...
+
+  front:
+    name: Front
+    needs: detect
+    if: needs.detect.outputs.front == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint
+      - run: pnpm -r test
+      - run: pnpm -r build
