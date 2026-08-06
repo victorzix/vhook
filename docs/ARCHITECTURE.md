@@ -469,7 +469,7 @@ Dois efeitos colaterais que valem por si:
 
 **Registro e catálogo são artefatos separados, e é isso que impede divergência.** O registro em `internal/errs` tem comportamento e nenhum texto; o catálogo em `i18n/errors.<locale>.json` tem texto e nenhum comportamento, indexado por código. Um catálogo por locale, consumido pelos dois lados: `go:embed` no Go, import direto no dashboard. Um teste garante que todo código registrado tem entrada em todo locale — é o tipo de furo que passa em review e aparece em produção como mensagem vazia.
 
-A v1 tem **um único locale, `pt-BR`**. A coluna existe para que adicionar idioma depois seja um arquivo novo, não uma migração — e o teste de completude é justamente o que torna essa adição segura, porque ele falha enquanto o novo locale estiver incompleto.
+São **quatro locales**: `pt-BR` (default de `applications.locale`), `en`, `es` e `fr`. Não é escolha independente — o dashboard atende esses quatro idiomas, e é ele quem traduz o código de erro da API, então o catálogo precisa cobrir os mesmos. Efeito colateral bem-vindo: o webhook de saída passa a poder ser entregue no idioma do cliente. O teste de completude é o que torna adicionar idioma seguro, porque falha enquanto o novo locale estiver incompleto.
 
 **Propagação entre serviços: o código original atravessa.** Um serviço que recebe erro de outro repassa o código de origem e **não** o recodifica. Recodificar em cada salto perde a origem, que é exatamente a informação que se quer quando algo falha três camadas abaixo. Só se cria código novo quando a semântica muda de verdade — e aí o original vai para o log.
 

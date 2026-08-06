@@ -10,21 +10,27 @@ Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadast
 
 Go · RabbitMQ · Postgres (via sqlc) · Next.js. Não propor troca de nenhum deles sem motivo que não esteja já respondido no documento.
 
+Regras de back em [`internal/CLAUDE.md`](internal/CLAUDE.md). Regras de front em [`apps/CLAUDE.md`](apps/CLAUDE.md), com os deltas do comercial em [`apps/commercial/CLAUDE.md`](apps/commercial/CLAUDE.md).
+
 ## Estrutura pretendida
 
 ```
 cmd/{api,worker,reconciler,sink}/main.go
-internal/core/       domínio puro: backoff, classificação de falha
-internal/store/      Postgres via sqlc
+internal/core/       domínio puro — não importa nada
+internal/ingress/    handler + service
+internal/endpoints/  handler + service + repo
+internal/delivery/   service + repo (consumido pelo worker)
 internal/queue/      porta + adapter Rabbit
 internal/dispatch/   cliente HTTP, HMAC, guard de SSRF, timeout
-internal/httpapi/    handlers de ingress e management
+internal/store/      sqlc gerado, pool, advisory locks
 internal/errs/       registro de erros: código, nível, status
 internal/obs/        slog e métricas
 contracts/           openapi.yaml + events/*.schema.json (fonte única)
-i18n/                errors.<locale>.json — catálogo compartilhado Go + dashboard
+i18n/                errors.{pt-BR,en,es,fr}.json — catálogo compartilhado Go + front
 migrations/
-apps/dashboard/      Next.js
+apps/dashboard/      Next.js — painel
+apps/commercial/     Next.js — página de vendas
+packages/ui/         shadcn + componentes compartilhados entre os apps
 ```
 
 ## Invariantes — não quebrar sem discutir
@@ -87,6 +93,7 @@ entrevista  →  spec  →  contratos  →  aprovação
 Os contratos entram **antes** da aprovação, não depois: é aprovando a spec que request, response e payload deixam de ser prosa e viram definição executável.
 
 - Uma spec é uma **pasta agrupada por domínio**: `docs/specs/<domínio>/NNN-name/{spec.md, plan.md, result.md}`. **Sobrescreve o default `docs/superpowers/` das skills** — o caminho não deve carregar o nome da ferramenta que gerou o documento.
+- Os domínios de spec espelham os pacotes em `internal/`: uma spec de endpoints toca uma pasta.
 - **O domínio agrupa, o número ordena.** Numeração global, nunca reiniciada por domínio: `spec 006` identifica sem ambiguidade. Buraco na sequência dentro de uma pasta é registro de evolução, não defeito.
 - Índice, lista de domínios e regras em [`docs/specs/README.md`](docs/specs/README.md). Uma spec só está aprovada quando entra no índice. Templates em [`docs/specs/_template_/`](docs/specs/_template_/README.md).
 - `result.md` registra **divergência e evidência**, nunca o que o CHANGELOG já diz. Sem divergência, uma linha dizendo isso basta.
@@ -109,7 +116,7 @@ O específico deste projeto:
 |---|---|---|
 | `internal/core` | `go test`, sem container | milissegundos — é aqui que o loop red-green mora |
 | `internal/{store,queue,dispatch}` | testcontainers (Postgres, RabbitMQ) | segundos |
-| `apps/dashboard` | a definir | — |
+| `apps/*` | Vitest · Testing Library · Playwright | ver [`apps/CLAUDE.md`](apps/CLAUDE.md) |
 
 `internal/core` é puro de propósito. Se um teste seu está pedindo container para exercitar regra de negócio, o sinal é que a lógica está no pacote errado — mova para `core` antes de aceitar o container.
 
@@ -123,7 +130,8 @@ Nunca encerrar uma tarefa com teste vermelho.
 
 ## Convenções
 
-- **Quem commita é o dono do repositório, nunca o agente.** Pare no ponto de commit, deixe a árvore num estado coerente e entregue a mensagem pronta para copiar. Não rode `git commit` nem `git push`.
+- **Quem commita é o dono do repositório, nunca o agente.** Pare no ponto de commit e entregue a mensagem pronta. Não rode `git commit` nem `git push`.
+- **Mensagem de commit curta:** só a linha de assunto, no imperativo, até ~60 caracteres. Corpo apenas quando o porquê não cabe no assunto — e aí uma linha, não um parágrafo. O raciocínio longo mora na spec e no `ARCHITECTURE.md`, não no histórico.
 - **Conventional Commits** obrigatório — `feat:` e `fix:` alimentam o release-please, que gera CHANGELOG, tag e release. Uma versão única para o sistema inteiro.
 - **Nomes de arquivo e de pasta sempre em inglês**, mesmo quando o conteúdo é em português. Exceção só para termo de domínio que não tem tradução honesta (`inscricao-municipal`, `nota-fiscal`) — traduzir esses inventa um conceito que não existe.
 - **Conteúdo de documentação e mensagens de commit em português.** Código, identificadores, comentários e logs em inglês.

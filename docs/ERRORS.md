@@ -91,7 +91,7 @@ Código, nível e todo o detalhe técnico — incluindo o que nunca sai numa res
 | Registro | `internal/errs/` | código, nível, status. **Nenhum texto.** |
 | Catálogo | `i18n/errors.<locale>.json` | código → mensagem. **Nenhum comportamento.** |
 
-A v1 tem um locale só: `i18n/errors.pt-BR.json`, que é também o default de `applications.locale`. Idioma novo é um arquivo novo, sem migração — e o teste de completude abaixo é o que garante que ele entre inteiro ou não entre.
+Quatro locales: `pt-BR` (default de `applications.locale`), `en`, `es`, `fr` — os mesmos do dashboard, porque é o front quem traduz o código de erro da API. Um arquivo por locale, e o teste de completude abaixo garante que nenhum código entre sem tradução em todos eles.
 
 Separados de propósito: é o que impede as duas fontes de divergirem. O catálogo é consumido pelos dois lados — `go:embed` no Go, import direto no dashboard — então existe uma cópia só.
 
