@@ -128,20 +128,26 @@ components:
           type: string
           enum: [ready]
         checks:
-          type: object
-          required: [postgres, rabbitmq]
-          additionalProperties: false
-          description: |
-            Só aparece na resposta 200, e aí todas as dependências estão `ok`.
-            Falha é expressa pelo envelope de erro: o `code` é o da primeira
-            dependência a falhar na ordem de checagem, e `details` lista todas.
-          properties:
-            postgres:
-              type: string
-              enum: [ok]
-            rabbitmq:
-              type: string
-              enum: [ok]
+          $ref: '#/components/schemas/ReadyChecks'
+
+    ReadyChecks:
+      type: object
+      required: [postgres, rabbitmq]
+      additionalProperties: false
+      description: |
+        Só aparece na resposta 200, e aí todas as dependências estão `ok`.
+        Falha é expressa pelo envelope de erro: o `code` é o da primeira
+        dependência a falhar na ordem de checagem, e `details` lista todas.
+
+        Schema nomeado em vez de objeto embutido para que o nome do tipo
+        gerado seja previsível — objeto anônimo faz o gerador inventar o nome.
+      properties:
+        postgres:
+          type: string
+          enum: [ok]
+        rabbitmq:
+          type: string
+          enum: [ok]
 
     ErrorCode:
       type: string
@@ -152,41 +158,50 @@ components:
         `MOD-TYP-NNN`. Contrato estável — pode ser usado em lógica de decisão.
         Ver `docs/ERRORS.md` para a taxonomia.
 
+    ErrorDetail:
+      type: object
+      required: [field, code]
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          description: |
+            Campo do formulário, ou nome da sub-checagem quando o erro tem
+            partes — em `/readyz`, `postgres` ou `rabbitmq`.
+          examples:
+            - url
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+
+    ErrorBody:
+      type: object
+      required: [code, correlation_id]
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        correlation_id:
+          type: string
+          description: |
+            Liga esta resposta ao log estruturado. Obrigatório: como não
+            há mensagem, é a única forma de investigar um caso relatado.
+          examples:
+            - 01HQZX3K7YB2N4M8P6R9T5V0W1
+        details:
+          type: array
+          description: |
+            Falhas por campo, para o dashboard destacar o formulário sem
+            que o backend produza texto. Ausente quando não se aplica.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
     Error:
       type: object
       required: [error]
       additionalProperties: false
       properties:
         error:
-          type: object
-          required: [code, correlation_id]
-          additionalProperties: false
-          properties:
-            code:
-              $ref: '#/components/schemas/ErrorCode'
-            correlation_id:
-              type: string
-              description: |
-                Liga esta resposta ao log estruturado. Obrigatório: como não
-                há mensagem, é a única forma de investigar um caso relatado.
-              examples:
-                - 01HQZX3K7YB2N4M8P6R9T5V0W1
-            details:
-              type: array
-              description: |
-                Falhas por campo, para o dashboard destacar o formulário sem
-                que o backend produza texto. Ausente quando não se aplica.
-              items:
-                type: object
-                required: [field, code]
-                additionalProperties: false
-                properties:
-                  field:
-                    type: string
-                    examples:
-                      - url
-                  code:
-                    $ref: '#/components/schemas/ErrorCode'
+          $ref: '#/components/schemas/ErrorBody'
 
   responses:
     Unauthorized:

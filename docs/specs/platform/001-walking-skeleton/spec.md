@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | em revisão |
+| **Status** | aprovada |
 | **Release alvo** | `v0.1.0` |
 | **Plano** | [`plan.md`](plan.md) |
 
@@ -22,7 +22,8 @@ Não existe código. Nenhuma spec de feature pode começar sem schema, geração
 | `Dockerfile` | multi-stage, binário estático, imagem final `gcr.io/distroless/static` |
 | `Makefile` | `up` `down` `run` `generate` `test` `test-integration` |
 | `migrations/` | as 7 tabelas de [§4.5](../../../ARCHITECTURE.md), via `golang-migrate`, aplicadas no boot da `api` sob advisory lock |
-| `internal/store` | pool `pgxpool` e `sqlc.yaml`; sem query própria — o schema já basta para gerar `models.go` |
+| `internal/store` | pool `pgxpool`, runner de migration e `sqlc.yaml` com a query de health |
+| `internal/openapi` | tipos **gerados** de `openapi.yaml`; nunca editados à mão |
 | `internal/errs` | os tipos de [`ERRORS.md`](../../../ERRORS.md) com nível e status, e as 4 primeiras constantes |
 | `i18n/errors.{pt-BR,en,es,fr}.json` | catálogo por locale, `go:embed`, com teste de completude |
 | `internal/ids` | UUIDv7 ↔ `prefixo_base32`: `Encode` e `Parse` |
@@ -210,6 +211,29 @@ SELECT * FROM events WHERE id = vhook_id('evt_01HQZX3K7YB2N4M8P6R9T5V0W1');
 
 Ela existe porque a escolha de base32 na borda tem um custo operacional real: o `psql` mostra o UUID cru, e investigar um `evt_01HQ…` relatado exigiria decodificar na mão. O risco de ter o encoding escrito duas vezes é coberto pelo teste de vetores compartilhados descrito abaixo.
 
+## Erros cunhados nesta release
+
+[`ERRORS.md`](../../../ERRORS.md) define a gramática — módulos, tipos, nível e status padrão por tipo — mas não existe nenhuma constante concreta ainda. Estas são as primeiras, e viram precedente:
+
+| Código | Quando | Nível | Status |
+|---|---|---|---|
+| `STO-DEP-001` | Postgres inalcançável ou lento além do timeout de checagem | `error` | **503** |
+| `QUE-DEP-001` | RabbitMQ inalcançável ou lento além do timeout de checagem | `error` | **503** |
+| `SYS-DEP-001` | Desligamento em andamento: a instância recusa novas requisições | **`warn`** | **503** |
+| `SYS-INT-001` | Panic capturado pelo middleware de recover | `error` | 500 |
+| `CFG-VAL-001` | Variável de ambiente obrigatória ausente no boot | `error` | — |
+
+Três sobrescrevem o default do seu tipo, e é o primeiro uso do mecanismo de sobrescrita do `ERRORS.md` — bom que ele nasça exercitado em vez de teórico:
+
+- **`STO-DEP-001` e `QUE-DEP-001` respondem 503 em vez do 502 padrão de `DEP`.** 502 significa "recebi resposta ruim de um upstream"; aqui o caso é "não estou pronta para servir", e 503 é o que orquestrador e cliente esperam para "tente de novo".
+- **`SYS-DEP-001` é `warn`, não o `error` padrão de `DEP`.** Desligamento é o caminho normal de um deploy. Registrá-lo como `error` treinaria quem opera a ignorar `error`.
+
+`CFG-VAL-001` não tem status porque nunca vira resposta HTTP: falta de configuração mata o processo antes de a porta abrir. Ele existe para mostrar que a constante carrega nível para o log mesmo quando não há requisição — o registro não é uma tabela de status HTTP.
+
+**Nenhum código para ID malformado nesta release.** Nenhuma rota da 001 recebe ID no caminho; `internal/ids` devolve erro sentinela de Go, e o código nasce na spec da primeira rota que aceita um.
+
+Cada um dos cinco exige entrada nos quatro locales de `i18n/errors.<locale>.json`, e o teste de completude falha enquanto faltar qualquer combinação.
+
 ## Invariantes tocados
 
 | Invariante | Como continua valendo |
@@ -238,7 +262,7 @@ Não toca: ordem de ack, DLQ por publicação explícita, mensagem magra, consta
 | Panic dentro de um handler | Middleware de recover devolve 500 `SYS-INT-001` com `correlation_id`; o processo continua servindo | log `error` com stack trace, nunca no corpo da resposta |
 | Variável de ambiente obrigatória ausente | Processo sai antes de abrir porta | log `error` com `CFG-VAL-001` nomeando a variável |
 | `X-Correlation-Id` do cliente malformado | Descartado; a requisição segue e responde normalmente | `client_correlation_id_dropped: true` no log |
-| `/readyz` recebido durante o desligamento | Passa a responder 503 assim que o sinal de término chega, antes de o servidor parar de aceitar conexão | drenagem correta atrás de load balancer |
+| `/readyz` recebido durante o desligamento | Responde 503 `SYS-DEP-001` assim que o sinal de término chega, antes de o servidor parar de aceitar conexão | drenagem correta atrás de load balancer |
 
 ## Como se prova que funciona
 
