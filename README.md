@@ -4,15 +4,15 @@ Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadast
 
 > **Status: em design.** Nada implementado ainda. Este arquivo é o resumo das decisões e vai ser substituído pelo README de produto quando o código começar.
 >
-> **O documento principal é [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)** — cada decisão com o porquê, o tradeoff aceito e as alternativas descartadas.
+> **O documento principal é [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — cada decisão com o porquê, o tradeoff aceito e as alternativas descartadas.
 
 ---
 
 ## Contexto e critério de sucesso
 
-O objetivo primário é **portfólio para vaga sênior**: o leitor-alvo é um tech lead lendo o repositório por 20 minutos. O que importa é arquitetura defensável, código legível e decisões explicadas — não escala real.
+Sistema novo, sem carga de produção e sem usuários. As restrições vêm daí: **legibilidade acima de escala**, e otimização só com medição que a justifique.
 
-Objetivo secundário declarado: **existe chance de virar produto vendável**. Isso não muda o escopo do MVP, mas muda o modelo de dados — ele nasce multi-tenant, porque tenancy é barata agora e caríssima de retrofitar depois.
+O que **não** é negociável mesmo agora é o que sai caro de retrofitar. O modelo de dados nasce multi-tenant e o formato da assinatura nasce versionado, porque mudar isso depois exige migrar dados ou quebrar todos os clientes. O resto nasce mínimo.
 
 ---
 
@@ -20,12 +20,12 @@ Objetivo secundário declarado: **existe chance de virar produto vendável**. Is
 
 | Decisão | Escolha | Por quê |
 |---|---|---|
-| Backend | **Go** | Sinaliza perfil infra/plataforma; concorrência no worker fica natural; binário pequeno no Docker |
-| Broker | **RabbitMQ** | É o que a vaga espera ver; DLQ é conceito nativo (dead-letter-exchange); TTL+DLX rende explicação não-óbvia |
+| Backend | **Go** | Concorrência do worker fica idiomática; binário estático deixa a imagem Docker mínima |
+| Broker | **RabbitMQ** | DLQ é conceito nativo (dead-letter-exchange), não algo que se emula; TTL+DLX resolve retry atrasado em AMQP puro |
 | Banco | **Postgres** | Endpoints, histórico de entregas e tentativas |
-| Frontend | **Next.js** | Também mira vaga fullstack; screenshot no README vende melhor |
+| Frontend | **Next.js** | Ecossistema maduro para o dashboard e para o BFF que resolve token, CORS e a futura sessão |
 | Tenancy | **Multi-tenant desde o schema** | `organization → application → endpoints → deliveries` |
-| Login humano | **Depois, com provider** (Clerk/Auth0/Supabase) | Agora o `org_id` vem de env/header fixo. Trocar a origem dele depois é uma função. Auth própria em Go foi descartada: superfície de ataque que não agrega sinal |
+| Login humano | **Depois, com provider** (Clerk/Auth0/Supabase) | Agora o `org_id` vem de env/header fixo. Trocar a origem dele depois é uma função. Auth própria em Go foi descartada: superfície de ataque a defender, longe de onde está o valor do sistema |
 | Retry agendado | **Escada de TTL + DLX** | Rabbit vanilla, sem plugin. Plugin `delayed-message-exchange` descartado por ser community e guardar agendamento no nó; scheduler em Postgres descartado por soar contraditório com ter um broker |
 | Modelagem | **`event` → `delivery` → `delivery_attempt`** | Um evento vira uma delivery por endpoint; sem isso não se responde "chegou em 3 dos 4 endpoints" |
 | Conteúdo da mensagem | **Magra: só `{delivery_id, attempt}`** | Uma query no caminho quente em troca de ver o estado atual do endpoint — sem isso o auto-disable não afeta o que já está na fila |
@@ -69,14 +69,14 @@ ingress --publish--> [ex: vhook.deliveries] --> (queue: deliveries) --> worker
                     esgotou tentativas --> [ex: vhook.dlx] --> (queue: dlq)
 ```
 
-As filas de espera **não têm consumidor**. A mensagem dorme lá até o `x-message-ttl` vencer e o Rabbit a dead-letter de volta para a exchange principal. São declaradas no boot a partir do config, então trocar o perfil de backoff é mudar uma env var.
+As filas de espera **não têm consumidor**. A mensagem dorme lá até o `x-message-ttl` vencer e o Rabbit a dead-letter de volta para a exchange principal. Todas são declaradas sempre no boot — fila vazia é praticamente grátis.
 
-**Backoff configurável por perfil**, porque a demo hospedada precisa ser assistível:
+**Dois perfis de backoff**, constantes em código, com cada application escolhendo o seu pela coluna `applications.backoff_profile`:
 
 - produção: `1min → 5min → 15min`
 - demo: `5s → 15s → 30s`
 
-### Duas decisões que valem defesa numa entrevista
+### Duas decisões não-óbvias
 
 **A DLQ recebe por publicação explícita do worker, não por `nack`.** Se a fila `deliveries` tivesse dead-letter próprio, ele colidiria com a escada de espera: a mensagem cairia na DLQ na primeira falha, não na última. Publicar explicitamente deixa a intenção legível no código.
 
@@ -94,18 +94,18 @@ Os três pilares originais:
 - **Segurança** — secret por endpoint, header `X-Vhook-Signature` em cada disparo
 - **Anti-gargalo** — timeout curto e agressivo (~5s) no disparador HTTP
 
-Mais os quatro extras aprovados:
+Mais os extras aprovados:
 
 - **Sink de teste embutido** — faz a demo hospedada funcionar sozinha, sem o visitante trazer URL
-- **Replay manual da DLQ** — botão "reenviar" no dashboard; toda plataforma séria de webhook tem, é a primeira coisa que um entrevistador procura
+- **Replay manual da DLQ** — botão "reenviar" no dashboard; sem ele, falha permanente é perda de dado do cliente
 - **Auto-disable de endpoint** — circuit breaker após N falhas consecutivas; um cliente morto não pode degradar a fila dos outros
-- **Idempotência no ingress** — `Idempotency-Key` + unique index; resposta pronta para "e se o produtor fizer retry?"
+- **Idempotência no ingress** — `Idempotency-Key` + unique index; o produtor também faz retry, e sem isso o evento é entregue duas vezes
 - **Guard de SSRF** — validação de URL no cadastro e sem seguir redirects
 - **Rate limit por application** — um produtor em loop não pode encher a fila dos outros
 - **Shards por hash** — raio de dano limitado quando um projeto entra em carga
 - **Reconciliador** — auto-cura de entregas presas; a fila é reconstruível do Postgres
 
-### Roadmap (fora da v1, mas no README como intenção)
+### Roadmap
 
 - Login humano com provider hospedado
 - Billing com Stripe — a medição de uso, que é a parte cara de retrofitar, já existe no schema
@@ -123,20 +123,20 @@ Mais os quatro extras aprovados:
 
 **Uma versão única para o sistema inteiro** — `api` e `worker` compartilham o contrato de fila e nunca serão deployados separados de verdade.
 
-**O changelog começa no commit 1**, não quando o produto ficar utilizável. O custo de gerar é zero e o valor de portfólio está na linha do tempo: `v0.1.0 ingress enfileira` → `v0.3.0 retry com backoff` → `v0.5.0 DLQ + replay`. Um repo que nasce na `v1.0.0` com tudo pronto parece código despejado; um com 12 releases parece trabalho sustentado. `0.x` já comunica "em construção".
+**O changelog começa no commit 1**, não quando o produto ficar utilizável. O custo de gerar é zero, e `0.x` já comunica "em construção" — não há razão para esperar uma versão estável antes de registrar o que mudou.
 
 ### O vhook anuncia as próprias releases
 
-O workflow de release publica um evento `release.published` no ingress do **próprio vhook**, que entrega no portfólio com HMAC, timeout, retry e DLQ. O projeto é cliente de si mesmo — e qualquer bug de entrega passa a doer em quem o escreveu.
+O workflow de release publica um evento `release.published` no ingress do **próprio vhook**, que entrega num consumidor externo com HMAC, timeout, retry e DLQ. O projeto é cliente de si mesmo, então qualquer bug de entrega passa a doer em quem o escreveu.
 
-Enquanto a URL do portfólio não existir, o passo de dispatch é no-op: as releases acontecem, o CHANGELOG cresce, as tags ficam lá. Quando o vhook subir na VPS e o portfólio existir, um script lê as tags do git e publica um evento por tag histórica. Nada manual.
+Enquanto a URL de destino não existir, o passo de dispatch é no-op: as releases acontecem, o CHANGELOG cresce, as tags ficam lá. Quando ela existir, um script lê as tags do git e publica um evento por tag histórica. Nada manual.
 
-O backfill é seguro por causa da idempotência: `Idempotency-Key: release-v0.3.0`. Rodar duas vezes não duplica nada. Não é coincidência — é a mesma feature da v1 resolvendo o problema real do dono do sistema.
+O backfill é seguro por causa da idempotência: `Idempotency-Key: release-v0.3.0`. Rodar duas vezes não duplica nada — é a mesma feature da v1 resolvendo um problema real de quem opera o sistema.
 
 ---
 
 ## Status
 
-O design está **fechado** — as 28 decisões estão em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md), cada uma com o tradeoff aceito e as alternativas descartadas.
+O design está **fechado** — as 30 decisões estão em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), cada uma com o tradeoff aceito e as alternativas descartadas.
 
 Próximo passo: o plano de implementação, e então `git init` com o primeiro commit em Conventional Commits.

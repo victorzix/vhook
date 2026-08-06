@@ -18,11 +18,11 @@ O vhook resolve isso com três garantias:
 
 ## 2. Contexto e restrições
 
-Isto é um projeto de portfólio com intenção secundária de virar produto. Essa dupla natureza guiou as escolhas de forma consistente:
+Sistema novo, sem carga de produção e sem usuários. Duas consequências guiaram as escolhas de forma consistente: não há dado para dimensionar nada, e o que sai caro de retrofitar precisa nascer certo mesmo assim.
 
 - **Legibilidade acima de escala.** Otimizações que só importam acima de milhares de eventos por segundo foram deliberadamente omitidas. Cada componente precisa ser compreensível numa leitura.
 - **Modelo de dados nasce certo, features nascem mínimas.** Multi-tenancy e formato de assinatura versionado estão no dia 1 porque retrofitar quebra clientes ou exige migração dolorosa. Login, billing e tracing distribuído ficaram fora porque plugam depois sem tocar no que existe.
-- **Nada de framework escondendo o mérito.** Bibliotecas que entregam retry/DLQ prontos foram evitadas: o valor do projeto está justamente em mostrar como esses mecanismos funcionam.
+- **Sem biblioteca dona da semântica central.** Retry, backoff e DLQ *são* o produto. Delegá-los a uma biblioteca que resolve tudo pronto significa que ajustar a política depois é discutir com as opiniões dela — e é justamente a parte que mais vai precisar de ajuste.
 
 ---
 
@@ -69,7 +69,7 @@ Quatro processos, cada um com uma responsabilidade única e testável isolado:
 
 **Tradeoff.** Uma dependência de infraestrutura a mais no compose, e AMQP tem curva de aprendizado. Nesta escala, um `SELECT ... FOR UPDATE SKIP LOCKED` em Postgres resolveria o mesmo problema com uma peça a menos — é a escolha que eu faria num sistema onde o broker fosse a única razão para ter Rabbit rodando.
 
-**Descartado.** Redis + Asynq entregaria retry, DLQ e web UI prontos, mas o mecanismo viraria configuração de biblioteca em vez de decisão de projeto. NATS JetStream tem backoff nativo mais limpo, porém é menos conhecido — o custo de explicar supera o de impressionar.
+**Descartado.** Redis + Asynq entregaria retry, DLQ e web UI prontos, mas colocaria a semântica central do produto dentro de uma biblioteca (§2). NATS JetStream tem backoff nativo mais limpo, porém é bem menos difundido: menos material operacional, menos gente com experiência e mais risco na hora de depurar comportamento estranho em produção.
 
 ### 4.2 Retry atrasado com escada de TTL + DLX
 
@@ -126,7 +126,8 @@ event (1) ──fanout──> delivery (N) ──tentativas──> delivery_atte
 
 ```
 organizations       id, name
-applications        id, org_id, name, api_key_hash, plan, backoff_profile
+applications        id, org_id, name, api_key_hash, plan, backoff_profile,
+                    locale
 endpoints           id, application_id, url, secret_encrypted, status,
                     consecutive_failures, disabled_at
 events              id, application_id, event_type, payload jsonb,
@@ -255,7 +256,7 @@ Uso concreto pelo próprio projeto: o backfill de releases (§4.16) usa `release
 
 **Tradeoff.** A demo pública não tem signup, então cada visitante vê a mesma organização. Aceitável para o objetivo.
 
-**Descartado.** Autenticação própria em Go — sessões, hash de senha, recuperação. Seria superfície de ataque que passo a ter que defender, sem agregar sinal técnico: o valor do projeto está em resiliência de entrega, não em bcrypt.
+**Descartado.** Autenticação própria em Go — sessões, hash de senha, recuperação. Seria superfície de ataque a manter e defender, longe de onde está o valor do sistema: resiliência de entrega, não gestão de credencial de usuário, que é problema resolvido por terceiros melhor do que eu resolveria.
 
 ### 4.15 Plano e rate limit
 
@@ -269,15 +270,15 @@ Billing de verdade fica de fora: Stripe, checkout e planos pagos plugam depois s
 
 ### 4.16 Versionamento: release-please, e o vhook anuncia as próprias releases
 
-**Decisão.** Conventional Commits como fonte da verdade, release-please no GitHub Actions gerando CHANGELOG, tag e GitHub Release. Versão única para o sistema inteiro. O workflow de release publica um evento `release.published` no ingress do **próprio vhook**, que entrega no portfólio.
+**Decisão.** Conventional Commits como fonte da verdade, release-please no GitHub Actions gerando CHANGELOG, tag e GitHub Release. Versão única para o sistema inteiro. O workflow de release publica um evento `release.published` no ingress do **próprio vhook**, que o entrega num consumidor externo.
 
 **Por quê.** Versão única porque `api` e `worker` compartilham o contrato de fila e nunca serão deployados separados de verdade — versioná-los em separado criaria a ilusão de independência que não existe.
 
-O changelog começa no primeiro commit, não quando o produto ficar utilizável: o custo de gerar é zero e a linha do tempo (`v0.1.0 ingress enfileira` → `v0.3.0 retry com backoff` → `v0.5.0 DLQ + replay`) é ela mesma o artefato interessante. `0.x` já comunica "em construção".
+O changelog começa no primeiro commit, não quando o produto ficar utilizável: o custo de gerar é zero e `0.x` já comunica "em construção", então esperar por uma versão estável não compra nada.
 
-O dogfooding não é piada: qualquer bug de entrega passa a doer em quem escreveu o dispatcher. Enquanto a URL do portfólio não existir o passo é no-op, e um script de backfill publica um evento por tag histórica quando ela existir — seguro por idempotência (§4.13).
+O dogfooding é o ponto: qualquer bug de entrega passa a doer em quem escreveu o dispatcher, e o caminho de entrega passa a ser exercitado a cada release em vez de só em teste. Enquanto a URL de destino não existir o passo é no-op, e um script de backfill publica um evento por tag histórica quando ela existir — seguro por idempotência (§4.13).
 
-**Tradeoff.** Dependência circular: se o vhook estiver fora do ar durante uma release, o anúncio não sai. Falha benigna e reenviável pela DLQ, mas é uma dependência real assumida em troca da narrativa e do dogfooding.
+**Tradeoff.** Dependência circular: se o vhook estiver fora do ar durante uma release, o anúncio não sai. Falha benigna e reenviável pela DLQ, mas é uma dependência real assumida em troca de exercitar o próprio caminho de entrega continuamente.
 
 ### 4.17 O `sink` é um serviço separado
 
@@ -319,7 +320,7 @@ E o superprovisionamento se comporta melhor do que o cálculo proporcional justa
 
 **Tradeoff.** Projetos que colidem no mesmo shard ainda se afetam, e a colisão é sorteada, não escolhida — um tenant grande pode cair junto de um pequeno. A mitigação seletiva é fila dedicada (§5, roadmap), que é também uma feature natural de plano enterprise.
 
-**Descartado.** Fila por application dá isolamento verdadeiro e escala proporcional de verdade, sem shard vazio nem rehashing. O custo não é desperdício, é ciclo de vida: criação e destruição dinâmica de filas, descoberta de filas novas pelos workers, e milhares de processos de fila no broker conforme se vende. Vale como upgrade seletivo, não como default. Fair queuing em Postgres (round-robin entre applications via `DISTINCT ON`) daria justiça real com peso por plano, mas reintroduz o scheduler descartado em §4.2 e deixa o Rabbit decorativo.
+**Descartado.** Fila por application dá isolamento verdadeiro e escala proporcional de verdade, sem shard vazio nem rehashing. O custo não é desperdício, é ciclo de vida: criação e destruição dinâmica de filas, descoberta de filas novas pelos workers, e milhares de processos de fila no broker conforme a base de tenants cresce. Vale como upgrade seletivo, não como default. Fair queuing em Postgres (round-robin entre applications via `DISTINCT ON`) daria justiça real com peso por plano, mas reintroduz o scheduler descartado em §4.2 e deixa o Rabbit decorativo.
 
 ### 4.20 Reconciliador: o Postgres é a rede de segurança
 
@@ -390,7 +391,10 @@ vhook/
 │   ├── queue/      porta + adapter Rabbit  ← isola o degrau 4 (§5)
 │   ├── dispatch/   cliente HTTP, HMAC, guard de SSRF, timeout
 │   ├── httpapi/    handlers de ingress e management
+│   ├── errs/       registro de erros: código, nível, status HTTP
 │   └── obs/        slog e métricas
+├── contracts/      openapi.yaml + events/*.schema.json (fonte única)
+├── i18n/           errors.<locale>.json — catálogo compartilhado Go + dashboard
 ├── migrations/
 ├── apps/dashboard/ Next.js
 └── docker-compose.yml
@@ -440,6 +444,55 @@ Números escolhidos sem dado de uso. Registrados como arbitrários e revisáveis
 
 O secret do endpoint pode ser revelado quantas vezes se quiser. A indústria mostra uma única vez, mas isso só é aceitável quando existe rotação: sem ela, perder o secret obrigaria a recriar o endpoint e reconfigurar o cliente. Muda para mostrar-uma-vez no mesmo momento em que a rotação entrar.
 
+### 4.29 Erros são constantes com código; a mensagem depende de quem é dono da UI
+
+**Decisão.** Todo erro é uma constante que carrega **código, nível e status HTTP**. O código tem o formato `MOD-TYP-NNN` (`AUT-CRD-001`). A taxonomia completa está em [`ERRORS.md`](ERRORS.md).
+
+Três superfícies com contratos diferentes:
+
+| Superfície | O que vai | Quem traduz |
+|---|---|---|
+| API → dashboard | código, `correlation_id`, `details[]` — **sem mensagem** | o front, via catálogo i18n |
+| vhook → endpoint do cliente | código **e** mensagem já resolvida | o vhook, no idioma de `applications.locale` (default `pt-BR`) |
+| log e métrica | código, nível e todo o detalhe técnico | ninguém, é interno |
+
+**Por quê.** O princípio que decide as três linhas é o mesmo: **quem traduz é quem é dono da interface.** O dashboard é nosso, então o catálogo vive no front e a API não carrega texto — trocar uma frase deixa de ser deploy de backend. O sistema do cliente não vai implementar o nosso catálogo, então mandar só código ali empurraria trabalho para quem integra; a mensagem é resolvida antes de sair.
+
+Dois efeitos colaterais que valem por si:
+
+- Código estável separa contrato de texto. A mensagem pode ser reescrita sem quebrar cliente nenhum, e o cliente pode ramificar lógica em cima do código com segurança.
+- Mensagem não vaza detalhe interno por acidente. Num sistema onde o worker fala com a rede interna (§4.11), `dial tcp 10.0.0.5:5432: connect: connection refused` numa resposta de API é vazamento de topologia.
+
+**O nível vive na constante como padrão, não como verdade.** Um endpoint de cliente respondendo 503 é `warn`; o mesmo endpoint na enésima falha consecutiva, disparando o circuit breaker, é `error`. A constante define o default para que o nível não seja decidido ad-hoc em cada call site; o call site pode escalar.
+
+**O status HTTP também vive na constante.** Sem isso o mesmo erro devolve 400 num handler e 422 noutro, e a inconsistência só aparece para quem integra.
+
+**Registro e catálogo são artefatos separados, e é isso que impede divergência.** O registro em `internal/errs` tem comportamento e nenhum texto; o catálogo em `i18n/errors.<locale>.json` tem texto e nenhum comportamento, indexado por código. Um catálogo por locale, consumido pelos dois lados: `go:embed` no Go, import direto no dashboard. Um teste garante que todo código registrado tem entrada em todo locale — é o tipo de furo que passa em review e aparece em produção como mensagem vazia.
+
+A v1 tem **um único locale, `pt-BR`**. A coluna existe para que adicionar idioma depois seja um arquivo novo, não uma migração — e o teste de completude é justamente o que torna essa adição segura, porque ele falha enquanto o novo locale estiver incompleto.
+
+**Propagação entre serviços: o código original atravessa.** Um serviço que recebe erro de outro repassa o código de origem e **não** o recodifica. Recodificar em cada salto perde a origem, que é exatamente a informação que se quer quando algo falha três camadas abaixo. Só se cria código novo quando a semântica muda de verdade — e aí o original vai para o log.
+
+**Tradeoff.** A API pública devolvendo só código é mais estrita que o padrão de mercado: Stripe manda código e mensagem, GitHub manda mensagem. Quem integra no ingress precisa consultar o catálogo para entender `ING-VAL-002`, o que é atrito real na primeira integração. O preço é pago com catálogo público em `ERRORS.md` — e comprado de volta em liberdade para reescrever texto sem versionar API.
+
+Custo secundário: toda condição de erro nova exige uma constante e uma entrada por locale antes de compilar limpo. É burocracia deliberada — é ela que impede o `fmt.Errorf("algo deu errado")` de virar contrato por descuido.
+
+**Descartado.** Mensagem no backend com i18n server-side para as duas superfícies: centralizaria o texto, mas obrigaria deploy de backend para corrigir uma frase do dashboard e mandaria o idioma do usuário no request. Código sem nível nem status na constante: deixaria as duas decisões para o call site, que é onde a inconsistência nasce.
+
+### 4.30 Contrato antes de código, e o código é gerado a partir dele
+
+**Decisão.** `contracts/openapi.yaml` (API REST) e `contracts/events/*.schema.json` (payloads que saem) são fonte única. Tipos Go (`oapi-codegen`) e TS (`openapi-typescript`) são gerados. Os contratos são editados durante a **aprovação da spec**, antes de existir implementação.
+
+**Por quê.** Dois formatos porque são duas naturezas: OpenAPI descreve endpoints que nós expomos; os payloads entregues são requisições que **nós fazemos** contra o servidor de outra pessoa, o que OpenAPI não modela — e JSON Schema, além de modelar, serve de documentação para quem integra.
+
+Gerar os tipos nos dois lados é o que torna drift entre front e back impossível em vez de improvável. E editar o contrato antes do código é o que faz a implementação ser rápida: os tipos já existem quando o primeiro teste é escrito.
+
+**Código gerado nunca é editado à mão**, e há teste verificando que o gerado está em dia com o contrato. Sem esse teste, "esqueci de regenerar" produz divergência que só aparece em runtime — exatamente o que ter contrato deveria impedir.
+
+**Tradeoff.** Toda mudança de superfície passa a exigir editar YAML, regenerar e commitar o gerado — atrito real em mudança pequena. E ferramenta de codegen tem opiniões: o formato dos tipos produzidos não é o que se escreveria à mão, o que às vezes obriga a adaptar o contrato ao gerador em vez do contrário.
+
+**Descartado.** Contrato em markdown descritivo: rápido de escrever, mas nada valida e nada gera, então ele diverge do código em silêncio — e contrato em que se confia estando errado é pior que contrato nenhum. Contrato dentro da pasta de cada spec: `/v1/endpoints` não pertence a uma feature, então a definição da API ficaria espalhada em N pastas, cada uma congelada no dia em que foi escrita. Snapshot por spec junto do contrato vivo: a cópia desatualizada conviveria com a atual e alguém leria a errada — o histórico do git já preserva a intenção original.
+
 ---
 
 ## 5. Escada de escala
@@ -487,7 +540,7 @@ Registrado porque escopo negado é decisão:
 
 | Fora | Por quê |
 |---|---|
-| Login e signup | Plugável depois via provider; caro agora e sem sinal técnico |
+| Login e signup | Plugável depois via provider; caro agora e longe do valor do sistema |
 | Billing, checkout, planos pagos | Plugável depois; a medição de uso, que é a parte cara, já existe |
 | OpenTelemetry / tracing distribuído | Risco de virar o projeto |
 | Criptografia de payload ponta a ponta | Mata adoção; enquadrada como feature de plano pago |
@@ -510,4 +563,4 @@ Registrado porque escopo negado é decisão:
 1. **Endpoints** — URL, status, taxa de sucesso em 24h, última entrega. Criar, editar, desativar, reativar, revelar secret.
 2. **Feed de entregas** — timestamp, `event_type`, endpoint, status, código HTTP, tempo de resposta, número de tentativas. Filtros por status e endpoint, atualizando por SSE.
 3. **Detalhe da entrega** — payload enviado, headers de assinatura, e a timeline de tentativas com código, snippet da resposta, erro e "próxima tentativa às 14h32". Botão de replay quando `dead`.
-4. **Playground** — dispara um evento de teste contra o `sink` escolhendo `/ok`, `/500` ou `/timeout`. É esta tela que faz a demo hospedada funcionar sem o visitante trazer uma URL, e é o print que vai no README.
+4. **Playground** — dispara um evento de teste contra o `sink` escolhendo `/ok`, `/500` ou `/timeout`. É esta tela que permite exercitar o ciclo completo de falha, backoff e DLQ sem depender de um endpoint externo.

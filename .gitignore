@@ -24,3 +24,6 @@ Thumbs.db
 
 # Lixo de crash do Cygwin/Git Bash
 *.stackdump
+
+# Notas privadas de posicionamento
+NOTES.md
