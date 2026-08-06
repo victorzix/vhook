@@ -1,0 +1,930 @@
+<title>vhook — documentação visual</title>
+
+<style>
+/* Estilo da página de docs do vhook.
+   A CSP dos Artifacts bloqueia stylesheet externo, então este arquivo é a
+   FONTE e o conteúdo é injetado inline por docs/pages/build.sh. */
+
+:root {
+  --ground:      #F2F5F7;
+  --surface:     #FFFFFF;
+  --surface-alt: #E8EDF1;
+  --ink:         #131A21;
+  --ink-soft:    #4E5B67;
+  --ink-faint:   #7E8B97;
+  --rule:        #D2DAE1;
+  --accent:      #94620A;
+  --accent-bg:   #F6EDD8;
+  --ok:          #0E6E66;
+  --warn:        #97600C;
+  --dead:        #97142F;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:      #10151A;
+    --surface:     #171E25;
+    --surface-alt: #1F282F;
+    --ink:         #E6EBEF;
+    --ink-soft:    #A6B2BD;
+    --ink-faint:   #77848F;
+    --rule:        #2A343D;
+    --accent:      #E9B34C;
+    --accent-bg:   #2B2214;
+    --ok:          #4ECDC0;
+    --warn:        #E9B34C;
+    --dead:        #F5859B;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #10151A;
+  --surface:     #171E25;
+  --surface-alt: #1F282F;
+  --ink:         #E6EBEF;
+  --ink-soft:    #A6B2BD;
+  --ink-faint:   #77848F;
+  --rule:        #2A343D;
+  --accent:      #E9B34C;
+  --accent-bg:   #2B2214;
+  --ok:          #4ECDC0;
+  --warn:        #E9B34C;
+  --dead:        #F5859B;
+}
+
+:root[data-theme="light"] {
+  --ground:      #F2F5F7;
+  --surface:     #FFFFFF;
+  --surface-alt: #E8EDF1;
+  --ink:         #131A21;
+  --ink-soft:    #4E5B67;
+  --ink-faint:   #7E8B97;
+  --rule:        #D2DAE1;
+  --accent:      #94620A;
+  --accent-bg:   #F6EDD8;
+  --ok:          #0E6E66;
+  --warn:        #97600C;
+  --dead:        #97142F;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- shell ---- */
+
+.shell {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.75rem;
+  align-items: start;
+}
+
+@media (min-width: 62rem) {
+  .shell {
+    grid-template-columns: 14rem 1fr;
+    gap: 3rem;
+    padding-top: 2.5rem;
+  }
+}
+
+/* ---- sidebar ---- */
+
+.side { display: flex; flex-direction: column; gap: 1.25rem; }
+
+@media (min-width: 62rem) {
+  .side { position: sticky; top: 2.5rem; }
+}
+
+.brand { display: flex; flex-direction: column; gap: 0.15rem; }
+.brand-mark {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  margin: 0;
+  line-height: 1;
+}
+.brand-mark span { color: var(--accent); }
+.brand-sub {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.nav { display: flex; gap: 0.25rem; overflow-x: auto; padding-bottom: 0.25rem; }
+@media (min-width: 62rem) {
+  .nav { flex-direction: column; overflow: visible; padding-bottom: 0; }
+}
+
+.nav a {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.4rem 0.65rem;
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+.nav a:hover { background: var(--surface-alt); color: var(--ink); }
+.nav a[aria-current="page"] {
+  background: var(--accent-bg);
+  border-left-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav a i {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.nav a[aria-current="page"] i { color: var(--accent); }
+
+.side-note {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--rule);
+  padding-top: 0.9rem;
+  margin: 0;
+  display: none;
+}
+@media (min-width: 62rem) { .side-note { display: block; } }
+.side-note code { background: none; padding: 0; color: var(--accent); font-size: 0.95em; }
+
+/* ---- pages ---- */
+
+/* Páginas inativas saem da tela mas MANTÊM layout: o Mermaid precisa de
+   largura real para medir os rótulos, e em display:none ele renderiza o SVG
+   com dimensão errada. Absolute + visibility:hidden preserva a medição e
+   ainda tira o elemento do fluxo, então a altura da página é só a ativa. */
+.stage { position: relative; }
+
+.page { display: flex; flex-direction: column; gap: 3rem; min-width: 0; }
+.page.is-off {
+  position: absolute;
+  top: 0;
+  left: -200vw;
+  width: 100%;
+  visibility: hidden;
+}
+
+.prose { max-width: 64ch; display: flex; flex-direction: column; gap: 0.9rem; }
+.prose p { margin: 0; color: var(--ink-soft); }
+.prose strong { color: var(--ink); font-weight: 620; }
+.prose em { color: var(--ink); font-style: italic; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.87em;
+  background: var(--surface-alt);
+  padding: 0.1em 0.36em;
+  border-radius: 3px;
+  color: var(--ink);
+}
+
+.pagehead { display: flex; flex-direction: column; gap: 0.6rem; }
+
+h1 {
+  font-size: clamp(1.7rem, 4.5vw, 2.4rem);
+  line-height: 1.12;
+  letter-spacing: -0.032em;
+  font-weight: 620;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.lede {
+  font-size: clamp(1rem, 2.2vw, 1.12rem);
+  color: var(--ink-soft);
+  max-width: 54ch;
+  margin: 0;
+  text-wrap: balance;
+}
+
+section { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+}
+.eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+h2 {
+  font-size: clamp(1.25rem, 2.6vw, 1.55rem);
+  line-height: 1.22;
+  letter-spacing: -0.018em;
+  font-weight: 620;
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* ---- diagram panel: follows the theme, never forced light ---- */
+
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1.5rem 1rem;
+  overflow-x: auto;
+}
+.sheet pre.mermaid {
+  margin: 0;
+  background: none;
+  display: flex;
+  justify-content: center;
+  min-width: min-content;
+}
+.cap {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0.6rem 0 0;
+}
+
+/* ---- cards ---- */
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: inherit;
+}
+a.card:hover { border-color: var(--accent); }
+.card-name { font-family: var(--mono); font-size: 0.93rem; font-weight: 600; color: var(--accent); margin: 0; }
+.card-body { margin: 0; font-size: 0.9rem; color: var(--ink-soft); }
+.card-foot {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  border-top: 1px dashed var(--rule);
+  padding-top: 0.65rem;
+}
+.card-foot b {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.15rem;
+  font-weight: 600;
+}
+
+/* ---- state pills ---- */
+
+.states { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.state {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.state em { font-family: var(--sans); font-style: normal; color: var(--ink-soft); }
+.s-pending    { color: var(--ink-faint); }
+.s-delivering { color: var(--accent); }
+.s-succeeded  { color: var(--ok); }
+.s-failed     { color: var(--warn); }
+.s-dead       { color: var(--dead); }
+
+/* ---- chips ---- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  color: var(--ink-faint);
+  background: var(--surface);
+}
+.chip b { color: var(--ink); font-weight: 600; }
+
+/* ---- tables ---- */
+
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.89rem; }
+th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  background: var(--surface-alt);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-soft); }
+td code { background: none; padding: 0; color: var(--accent); }
+
+/* ---- invariants ---- */
+
+.inv { display: flex; flex-direction: column; gap: 0.6rem; }
+.inv-item {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--dead);
+  border-radius: 3px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.inv-rule { margin: 0; font-size: 0.92rem; font-weight: 560; }
+.inv-rule code { background: none; padding: 0; color: var(--accent); }
+.inv-fail { margin: 0; font-size: 0.84rem; color: var(--ink-faint); }
+.inv-fail b {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dead);
+  margin-right: 0.4rem;
+}
+
+/* ---- repo map ---- */
+
+.map {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.85;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1.05rem 1.15rem;
+  overflow-x: auto;
+  margin: 0;
+  white-space: pre;
+  color: var(--ink-soft);
+}
+.map b { color: var(--ink); font-weight: 600; }
+.map i { color: var(--ink-faint); font-style: normal; }
+
+.note {
+  font-size: 0.84rem;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+  max-width: 64ch;
+  margin: 0;
+}
+.note code { background: none; padding: 0; color: var(--accent); }
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="shell">
+
+  <aside class="side">
+    <div class="brand">
+      <p class="brand-mark">v<span>hook</span></p>
+      <p class="brand-sub">webhook dispatcher</p>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#/visao-geral"><i>01</i>Visão geral</a>
+      <a href="#/filas"><i>02</i>Filas e entrega</a>
+      <a href="#/dados"><i>03</i>Modelo de dados</a>
+      <a href="#/invariantes"><i>04</i>Invariantes e escala</a>
+    </nav>
+    <p class="side-note">Visão derivada de <code>docs/diagrams/</code> e <code>docs/ARCHITECTURE.md</code>. Quando divergirem, o repositório está certo.</p>
+  </aside>
+
+  <main class="stage">
+
+    <!-- ============ 01 ============ -->
+    <div class="page" id="visao-geral">
+      <header class="pagehead">
+        <h1>Um webhook dispatcher que assume que o destino vai falhar</h1>
+        <p class="lede">Recebe eventos, enfileira e entrega em endpoints HTTP — com assinatura, timeout curto, retry com backoff e dead letter queue.</p>
+        <div class="chips">
+          <span class="chip">design <b>fechado</b></span>
+          <span class="chip"><b>30</b> decisões</span>
+          <span class="chip"><b>0</b> linhas de código</span>
+          <span class="chip">Go · RabbitMQ · Postgres · Next</span>
+        </div>
+      </header>
+
+      <section>
+        <p class="eyebrow">O problema</p>
+        <h2>A parte fácil é o POST</h2>
+        <div class="prose">
+          <p>A difícil é que <strong>o destino não é confiável e não é seu</strong>: o servidor do cliente cai, demora 40 segundos, responde 500 por meia hora, ou some.</p>
+          <p>Um dispatcher ingênuo trava, perde eventos, ou martela um endpoint morto até degradar a entrega de todos os outros clientes. As três garantias abaixo são a resposta a isso.</p>
+        </div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Garantia</th><th>Como</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Nada se perde</strong></td><td>O evento é persistido antes de qualquer tentativa. Publisher confirms, ack manual, e o Postgres como fonte reconstruível.</td></tr>
+              <tr><td><strong>Falha temporária não é falha</strong></td><td>Reentrega com backoff exponencial. DLQ só no fim da linha, e replay manual a partir dela.</td></tr>
+              <tr><td><strong>Um cliente ruim não contamina os outros</strong></td><td>Timeout de 5s, shards por projeto, e desativação automática de endpoint em colapso.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Processos</p>
+        <h2>Cada um faz uma coisa — e a linha interessante é o que ele nunca faz</h2>
+        <div class="cards">
+          <article class="card">
+            <p class="card-name">api</p>
+            <p class="card-body">Recebe eventos, gerencia endpoints, serve o histórico.</p>
+            <p class="card-foot"><b>nunca</b>Faz requisição HTTP de saída.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">worker</p>
+            <p class="card-body">Consome a fila, dispara o POST assinado, decide retry ou DLQ.</p>
+            <p class="card-foot"><b>nunca</b>Recebe requisição.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">reconciler</p>
+            <p class="card-body">Varre entregas presas e republica. Réplica única, sob advisory lock.</p>
+            <p class="card-foot"><b>nunca</b>Roda em paralelo consigo mesmo.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">dashboard</p>
+            <p class="card-body">Interface, e BFF que guarda o token administrativo server-side.</p>
+            <p class="card-foot"><b>nunca</b>Fala com Rabbit nem Postgres.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">sink</p>
+            <p class="card-body">Alvo-cobaia da demo: <code>/ok</code>, <code>/500</code>, <code>/timeout</code>, <code>/flaky</code>.</p>
+            <p class="card-foot"><b>nunca</b>Vive dentro da api — o worker faz HTTP real.</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Repositório</p>
+        <h2>Onde cada coisa mora</h2>
+        <pre class="map"><b>cmd/</b>{api,worker,reconciler,sink}       <i>um main por processo</i>
+<b>internal/core/</b>       <i>domínio puro — backoff, classificação de falha</i>
+<b>internal/store/</b>      <i>Postgres via sqlc</i>
+<b>internal/queue/</b>      <i>porta + adapter Rabbit (isola o degrau 4)</i>
+<b>internal/dispatch/</b>   <i>HTTP, HMAC, guard de SSRF, timeout</i>
+<b>internal/errs/</b>       <i>registro de erros: código, nível, status</i>
+<b>contracts/</b>           <i>openapi.yaml + events/*.schema.json — fonte única</i>
+<b>i18n/</b>                <i>errors.pt-BR.json — texto, sem comportamento</i>
+<b>docs/specs/</b>          <i>por domínio, numeração global</i>
+<b>docs/diagrams/</b>       <i>mermaid — fonte desta página</i></pre>
+        <div class="prose">
+          <p><code>internal/core</code> não importa Postgres, Rabbit nem <code>net/http</code>. É o que mantém a suíte em milissegundos — e o sinal de que a lógica está no pacote errado é um teste pedindo container para exercitar regra de negócio.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ 02 ============ -->
+    <div class="page" id="filas">
+      <header class="pagehead">
+        <h1>Filas e entrega</h1>
+        <p class="lede">Como o RabbitMQ agenda o futuro sem saber agendar, e o que acontece com um evento entre o <code>202</code> e o cliente.</p>
+      </header>
+
+      <section>
+        <p class="eyebrow">Topologia</p>
+        <h2>A mensagem dorme numa fila que ninguém consome</h2>
+        <div class="prose">
+          <p>AMQP não tem "entregue isso em 5 minutos". A saída é uma fila de espera <strong>sem consumidor</strong>, com <code>x-message-ttl</code> e dead-letter apontando de volta para a exchange principal: o próprio broker devolve a mensagem quando o prazo vence.</p>
+          <p>O agendamento passa a ser responsabilidade do broker — <strong>não existe timer na aplicação para se perder num restart.</strong></p>
+        </div>
+        <div class="sheet">
+          <pre class="mermaid">
+flowchart LR
+    I["ingress"] --> EX["exchange<br/>vhook.deliveries"]
+    EX --> DQ["fila deliveries"]
+    DQ --> W["worker"]
+    W -->|"falhou 5xx / timeout"| WT["wait.5s · 15s · 30s<br/>wait.1m · 5m · 15m<br/>sem consumidor"]
+    WT -->|"TTL vence → dead-letter"| EX
+    W -->|"esgotou tentativas"| DLX["exchange vhook.dlx"]
+    DLX --> DLQ["fila dlq"]
+    W -.->|"NUNCA por nack"| X["dead-letter na<br/>fila deliveries"]
+
+    style X stroke-dasharray: 5 5
+          </pre>
+        </div>
+        <p class="cap">O caminho pontilhado é a armadilha: mandaria tudo para a DLQ na primeira falha</p>
+      </section>
+
+      <section>
+        <p class="eyebrow">Backoff</p>
+        <h2>Dois perfis, escolhidos por application</h2>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Perfil</th><th class="num">Nível 1</th><th class="num">Nível 2</th><th class="num">Nível 3</th><th>Para quê</th></tr></thead>
+            <tbody>
+              <tr><td><code>production</code></td><td class="num">1 min</td><td class="num">5 min</td><td class="num">15 min</td><td>Padrão de qualquer application</td></tr>
+              <tr><td><code>demo</code></td><td class="num">5 s</td><td class="num">15 s</td><td class="num">30 s</td><td>Para o ciclo ser assistível ao vivo</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p>Os perfis são constantes em código e <strong>todas as seis filas de espera são declaradas sempre</strong> — fila vazia é praticamente grátis. Cada application escolhe o seu por uma coluna, o que faz demo e produção coexistirem no mesmo deploy em vez de exigirem ambientes diferentes.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Fluxo</p>
+        <h2>A vida de uma entrega que falha e depois dá certo</h2>
+        <div class="sheet">
+          <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant P as produtor
+    participant A as api
+    participant DB as Postgres
+    participant Q as RabbitMQ
+    participant W as worker
+    participant C as cliente
+
+    P->>A: POST /v1/events
+    A->>DB: grava event + uma delivery por endpoint
+    A->>Q: publica {delivery_id, attempt:1}
+    Q-->>A: publisher confirm
+    A-->>P: 202 Accepted
+
+    Q->>W: entrega a mensagem
+    W->>DB: busca payload, url e secret
+    W->>C: POST assinado, timeout 5s
+    C-->>W: 503
+    W->>DB: grava attempt 1
+    W->>Q: publica na wait do nível 1
+    Q-->>W: confirm
+    W->>Q: ack da original
+
+    Note over W,Q: ack SÓ depois do confirm
+
+    Note over Q: dorme até o TTL vencer
+    Q->>Q: dead-letter de volta
+
+    Q->>W: {attempt:2}
+    W->>C: POST assinado
+    C-->>W: 200
+    W->>DB: delivery = succeeded
+          </pre>
+        </div>
+        <p class="cap">A ordem importa: invertida, uma morte do worker perderia o evento</p>
+        <div class="prose">
+          <p>O passo em que o worker <strong>busca payload, url e secret no banco</strong> é deliberado. A mensagem carrega só <code>{delivery_id, attempt}</code>, então o worker sempre vê o estado atual — e um endpoint desativado pelo circuit breaker não recebe, mesmo com fila cheia de mensagens antigas apontando para ele.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Estados</p>
+        <h2>Uma delivery caminha por cinco estados</h2>
+        <div class="states">
+          <span class="state s-pending">pending <em>na fila</em></span>
+          <span class="state s-delivering">delivering <em>em voo</em></span>
+          <span class="state s-succeeded">succeeded <em>2xx</em></span>
+          <span class="state s-failed">failed <em>4xx permanente</em></span>
+          <span class="state s-dead">dead <em>esgotou tentativas</em></span>
+        </div>
+        <div class="prose">
+          <p><code>dead</code> é separado de <code>failed</code> de propósito: <strong>o replay manual só faz sentido a partir da DLQ.</strong> É essa distinção que permite a interface oferecer o botão exatamente onde ele se aplica, em vez de em toda falha.</p>
+        </div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Resposta do cliente</th><th>Decisão</th></tr></thead>
+            <tbody>
+              <tr><td class="num">2xx</td><td>Sucesso</td></tr>
+              <tr><td class="num">3xx</td><td>Falha <strong>permanente</strong> — redirect não é seguido</td></tr>
+              <tr><td class="num">4xx</td><td>Falha permanente — o cliente rejeita de propósito, retry não muda nada</td></tr>
+              <tr><td class="num">408, 429</td><td>Retenta; honra <code>Retry-After</code> se razoável</td></tr>
+              <tr><td class="num">5xx</td><td>Retenta pela escada</td></tr>
+              <tr><td>timeout, DNS, TLS</td><td>Retenta pela escada</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p>Distinguir 4xx de 5xx é o detalhe que separa "implementei retry" de "entendi retry": insistir três vezes num <code>401</code> só queima worker e polui o histórico do cliente.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Isolamento</p>
+        <h2>Um projeto em carga não atrasa os outros</h2>
+        <div class="prose">
+          <p>Fila FIFO única não tem noção de justiça: quem publica atrás de um backlog de 50 mil eventos espera pelos 50 mil, por mais workers que existam — o gargalo é a posição, não a capacidade.</p>
+          <p>A saída são <strong>64 filas fixas, com hash por <code>application_id</code></strong>. O hash é por projeto e não por usuário, então os cinco projetos de um mesmo dono caem em shards diferentes e não bloqueiam um ao outro.</p>
+          <p>E o isolamento vem do <strong>prefetch por fila</strong>, não de particionar consumidores: um worker inscrito em 64 filas com prefetch 3 reserva 3 slots para cada shard. Um burst no shard 7 ocupa os 3 slots dele e não toca nos outros 189. Escalar é subir réplica, sem coordenação nem rebalanceamento.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ 03 ============ -->
+    <div class="page" id="dados">
+      <header class="pagehead">
+        <h1>Modelo de dados</h1>
+        <p class="lede">Seis tabelas, três níveis de entrega e duas credenciais guardadas de formas diferentes de propósito.</p>
+      </header>
+
+      <section>
+        <p class="eyebrow">Estrutura</p>
+        <h2>Um evento não é uma entrega</h2>
+        <div class="prose">
+          <p>Um evento publicado gera <strong>uma delivery por endpoint</strong> inscrito, e cada delivery acumula tentativas. Sem essa separação em três níveis é impossível responder a pergunta que o operador tem ao abrir o painel: <em>esse evento chegou em 3 dos 4 endpoints?</em></p>
+          <p>Colapsar evento e entrega numa tabela só forçaria duplicar o payload por destino e destruiria a noção de "o mesmo evento".</p>
+        </div>
+        <div class="sheet">
+          <pre class="mermaid">
+erDiagram
+    organizations ||--o{ applications      : possui
+    applications  ||--o{ endpoints         : possui
+    applications  ||--o{ events            : recebe
+    events        ||--o{ deliveries        : "uma por endpoint"
+    endpoints     ||--o{ deliveries        : "destino de"
+    deliveries    ||--o{ delivery_attempts : acumula
+
+    organizations {
+        uuid id PK
+        text name
+        timestamptz created_at
+    }
+    applications {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text api_key_hash
+        text plan
+        text backoff_profile
+        text locale
+    }
+    endpoints {
+        uuid id PK
+        uuid application_id FK
+        text url
+        bytea secret_encrypted
+        text status
+        int consecutive_failures
+        timestamptz disabled_at
+    }
+    events {
+        uuid id PK
+        uuid application_id FK
+        text event_type
+        jsonb payload
+        text idempotency_key
+        timestamptz received_at
+    }
+    deliveries {
+        uuid id PK
+        uuid event_id FK
+        uuid endpoint_id FK
+        text status
+        int attempt_count
+        timestamptz next_attempt_at
+        timestamptz completed_at
+    }
+    delivery_attempts {
+        uuid id PK
+        uuid delivery_id FK
+        int attempt_number
+        int status_code
+        int response_time_ms
+        text response_snippet
+        text error
+        timestamptz attempted_at
+    }
+          </pre>
+        </div>
+        <p class="cap">event = o que aconteceu · delivery = para quem · attempt = cada POST</p>
+      </section>
+
+      <section>
+        <p class="eyebrow">Credenciais</p>
+        <h2>Uma hasheada, a outra cifrada — e não é inconsistência</h2>
+        <div class="cards">
+          <article class="card">
+            <p class="card-name">applications.api_key_hash</p>
+            <p class="card-body">O cliente a usa para publicar eventos <strong>dentro</strong> do vhook.</p>
+            <p class="card-foot"><b>hasheada</b>Só é preciso verificar se bate. O valor original nunca é necessário de novo.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">endpoints.secret</p>
+            <p class="card-body">O vhook usa para assinar o que <strong>sai</strong>; o sistema do cliente usa para verificar.</p>
+            <p class="card-foot"><b>cifrada com aes-gcm</b>O valor em claro é necessário para calcular o HMAC. Hasheá-la impossibilitaria assinar.</p>
+          </article>
+        </div>
+        <div class="prose">
+          <p>É a diferença entre uma credencial que se <strong>verifica</strong> e uma que se <strong>usa</strong>. Cifrar o secret responde a uma ameaça mais provável que interceptação: um dump de banco vazado entregaria a capacidade de forjar webhooks assinados de todos os clientes.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Assinatura</p>
+        <h2>O timestamp entra dentro do que é assinado</h2>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Header</th><th>Conteúdo</th></tr></thead>
+            <tbody>
+              <tr><td><code>X-Vhook-Id</code></td><td>Id do evento, estável entre tentativas — é por ele que o cliente deduplica</td></tr>
+              <tr><td><code>X-Vhook-Timestamp</code></td><td>Epoch em segundos</td></tr>
+              <tr><td><code>X-Vhook-Signature</code></td><td><code>t=&lt;ts&gt;,v1=&lt;hmac_sha256&gt;</code> sobre <code>"{ts}.{corpo cru}"</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p>O timestamp assinado é o que impede replay: o cliente rejeita se o desvio passar de 5 minutos, e o atacante não consegue reassinar sem o secret. Assinar apenas o corpo deixaria qualquer chamada capturada válida para sempre.</p>
+          <p>O prefixo <code>v1=</code> num formato de lista permite enviar duas assinaturas durante uma janela de rotação de secret. A rotação em si é roadmap, mas <strong>o formato nasce pronto</strong> — retrofitar isso quebraria todos os clientes de uma vez.</p>
+          <p>E a assinatura é sobre os <strong>bytes crus</strong> do corpo. Desserializar e re-serializar muda a ordem das chaves, e a verificação do cliente passa a falhar de forma intermitente e praticamente indepurável.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Retenção</p>
+        <h2>O payload sai, os metadados ficam</h2>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Tabela</th><th class="num">Prazo</th><th>Observação</th></tr></thead>
+            <tbody>
+              <tr><td><code>delivery_attempts</code></td><td class="num">30 dias</td><td>A tabela que cresce mais rápido do sistema</td></tr>
+              <tr><td><code>deliveries</code></td><td class="num">90 dias</td><td>Exceto <code>dead</code>, que fica até resolução</td></tr>
+              <tr><td><code>events.payload</code></td><td class="num">30 dias</td><td>Anulado; os metadados são preservados</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p>Anular o payload e manter o resto é deliberado: o payload é ao mesmo tempo o dado sensível do cliente e o volumoso, enquanto os metadados são baratos e são a base da medição de uso — a parte de billing que é caro retrofitar, porque consumo passado é irrecuperável.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ 04 ============ -->
+    <div class="page" id="invariantes">
+      <header class="pagehead">
+        <h1>Invariantes e escala</h1>
+        <p class="lede">O que quebra sem lançar erro, e quais degraus existem quando a métrica pedir.</p>
+      </header>
+
+      <section>
+        <p class="eyebrow">Invariantes</p>
+        <h2>Nenhuma destas produz erro de compilação</h2>
+        <div class="prose">
+          <p>Todas produzem um sistema que <strong>parece funcionar</strong>. É por isso que cada uma está escrita com o modo de falha ao lado — sem ele, alguém "conserta" o que parece inconsistência.</p>
+        </div>
+        <div class="inv">
+          <div class="inv-item">
+            <p class="inv-rule">A DLQ recebe por publicação explícita — nunca dead-letter na fila <code>deliveries</code></p>
+            <p class="inv-fail"><b>se quebrar</b>Tudo vai para a DLQ na primeira falha, não na última. É a configuração que parece natural em RabbitMQ.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">Ack da mensagem original só depois do confirm da publicação na fila de espera</p>
+            <p class="inv-fail"><b>se quebrar</b>Uma morte do worker na janela errada perde o evento em silêncio, em vez de reprocessá-lo.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">O payload trafega como <code>[]byte</code> cru do ingress até o POST</p>
+            <p class="inv-fail"><b>se quebrar</b>Reserializar muda a ordem das chaves e a assinatura do cliente falha de forma intermitente.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">O número de shards é constante em código, idêntico em <code>api</code>, <code>worker</code> e <code>reconciler</code></p>
+            <p class="inv-fail"><b>se quebrar</b>Mensagens vão para filas que nenhum consumidor espera. Sem log, sem alerta, sem erro.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">A mensagem carrega só <code>{delivery_id, attempt}</code> — o worker busca o estado atual</p>
+            <p class="inv-fail"><b>se quebrar</b>O circuit breaker deixa de valer para o que já está na fila, que é justo quando ele mais importa.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">Nunca seguir redirect, e validar a URL contra faixas privadas no cadastro</p>
+            <p class="inv-fail"><b>se quebrar</b>O worker roda na rede interna: vira proxy de varredura, autenticado e com retry automático.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">Nenhuma métrica Prometheus leva <code>application_id</code> como label</p>
+            <p class="inv-fail"><b>se quebrar</b>Cardinalidade é multiplicativa: o Prometheus cai antes do vhook.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule"><code>internal/core</code> não importa Postgres, Rabbit nem <code>net/http</code></p>
+            <p class="inv-fail"><b>se quebrar</b>A suíte deixa de rodar em milissegundos e o loop de TDD morre por atrito.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">Paginação por cursor keyset em <code>(created_at, id)</code> — nunca <code>OFFSET</code></p>
+            <p class="inv-fail"><b>se quebrar</b>Funciona perfeitamente até a tabela crescer, e aí degrada sem que nada tenha mudado no código.</p>
+          </div>
+          <div class="inv-item">
+            <p class="inv-rule">O reconciliador roda em réplica única <strong>e</strong> sob advisory lock</p>
+            <p class="inv-fail"><b>se quebrar</b>O processo criado para curar duplicação passa a ser a maior fonte dela.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Escala</p>
+        <h2>Onde estamos, e os quatro degraus</h2>
+        <div class="prose">
+          <p>O design de hoje sustenta na ordem de <strong>centenas de entregas por segundo</strong> num VPS modesto — cerca de 65 milhões por dia. Cada degrau só é subido quando a métrica pedir.</p>
+        </div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th class="num">#</th><th>O que muda</th><th>Quando</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td>Mais réplicas de worker</td><td>Fila crescendo com CPU sobrando</td></tr>
+              <tr><td class="num">2</td><td>Cap de concorrência por application</td><td>Um tenant monopolizando slots do shard dele</td></tr>
+              <tr><td class="num">3</td><td>Fila dedicada para o tenant grande</td><td>Cliente exigindo isolamento contratual</td></tr>
+              <tr><td class="num">4</td><td>Kafka particionado por <code>application_id</code></td><td>O broker deixou de ser suficiente</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <p>O degrau 4 é conceitualmente barato <strong>porque o hash já é por <code>application_id</code></strong> — essa é literalmente a chave de partição do Kafka. Mas dois mecanismos não atravessam: a escada de TTL não tem equivalente, e o modelo de ack é incompatível. São uma a duas semanas, não uma troca de biblioteca.</p>
+          <p>E o motivo realista para migrar não é throughput: num dispatcher de webhook o fanout HTTP satura muito antes do broker. É querer retenção e replay nativos — decisão de produto, não de escala.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Fora do mapa</p>
+        <h2>O que não é dimensionável a partir daqui</h2>
+        <div class="prose">
+          <p>Cargas do tipo "5.000 projetos a 50.000 eventos/s cada" — 250 milhões por segundo — exigiriam centenas de máquinas só para sustentar socket. E o limite real seria do outro lado: <strong>50.000 requisições por segundo sustentadas contra o servidor de um cliente.</strong> Quem absorve isso não usa webhook, usa streaming.</p>
+          <p>Pré-construir para esse número sem dado de uso seria dimensionar no escuro.</p>
+        </div>
+        <p class="note">Fonte: <code>docs/ARCHITECTURE.md</code> e <code>CLAUDE.md</code> — quando divergirem, o repositório está certo e esta página está velha.</p>
+      </section>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  (function () {
+    var ROUTES = ["visao-geral", "filas", "dados", "invariantes"];
+    var pages = ROUTES.map(function (id) { return document.getElementById(id); });
+    var links = Array.prototype.slice.call(document.querySelectorAll("#nav a"));
+
+    function current() {
+      var id = (location.hash || "").replace(/^#\/?/, "");
+      return ROUTES.indexOf(id) === -1 ? ROUTES[0] : id;
+    }
+
+    function render(scroll) {
+      var active = current();
+      pages.forEach(function (p) {
+        var off = p.id !== active;
+        p.classList.toggle("is-off", off);
+        if (off) { p.setAttribute("aria-hidden", "true"); }
+        else { p.removeAttribute("aria-hidden"); }
+      });
+      links.forEach(function (a) {
+        var match = a.getAttribute("href").replace(/^#\//, "") === active;
+        if (match) { a.setAttribute("aria-current", "page"); }
+        else { a.removeAttribute("aria-current"); }
+      });
+      var title = links.filter(function (a) {
+        return a.getAttribute("href").replace(/^#\//, "") === active;
+      })[0];
+      if (title) { document.title = "vhook — " + title.textContent.replace(/^\d+/, "").trim(); }
+      if (scroll) { window.scrollTo(0, 0); }
+    }
+
+    window.addEventListener("hashchange", function () { render(true); });
+
+    // Sem espera por render de diagrama: as páginas inativas continuam com
+    // layout (ver .page.is-off no CSS), então o Mermaid mede certo em todas
+    // desde o primeiro frame.
+    render(false);
+  })();
+</script>
