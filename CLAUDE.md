@@ -78,13 +78,17 @@ Cada uma existe por um motivo que já foi decidido. Quebrar qualquer uma produz 
 Nada é implementado sem spec aprovada. O fluxo:
 
 ```
-spec  →  contratos  →  aprovação  →  plan  →  TDD task por task  →  result  →  release
+entrevista  →  spec  →  contratos  →  aprovação
+     →  plan  →  TDD task por task  →  result  →  release
 ```
+
+**Toda spec começa por entrevista: invoque a skill `brainstorming`.** Uma pergunta por vez, alternativas com tradeoff, design aprovado — e a spec é o resultado escrito disso, nunca o ponto de partida. Vale para spec pequena: se for simples mesmo, a entrevista acaba em duas perguntas.
 
 Os contratos entram **antes** da aprovação, não depois: é aprovando a spec que request, response e payload deixam de ser prosa e viram definição executável.
 
-- Uma spec é uma **pasta**: `docs/specs/NNN-name/{spec.md, plan.md, result.md}`. **Sobrescreve o default `docs/superpowers/` das skills** — o caminho não deve carregar o nome da ferramenta que gerou o documento.
-- Os templates e as regras de preenchimento estão em [`docs/specs/_template_/`](docs/specs/_template_/README.md). Leia o `README.md` de lá antes de escrever a primeira spec.
+- Uma spec é uma **pasta agrupada por domínio**: `docs/specs/<domínio>/NNN-name/{spec.md, plan.md, result.md}`. **Sobrescreve o default `docs/superpowers/` das skills** — o caminho não deve carregar o nome da ferramenta que gerou o documento.
+- **O domínio agrupa, o número ordena.** Numeração global, nunca reiniciada por domínio: `spec 006` identifica sem ambiguidade. Buraco na sequência dentro de uma pasta é registro de evolução, não defeito.
+- Índice, lista de domínios e regras em [`docs/specs/README.md`](docs/specs/README.md). Uma spec só está aprovada quando entra no índice. Templates em [`docs/specs/_template_/`](docs/specs/_template_/README.md).
 - `result.md` registra **divergência e evidência**, nunca o que o CHANGELOG já diz. Sem divergência, uma linha dizendo isso basta.
 - Cada spec vira uma release demonstrável. Se não dá para demonstrar sozinha, está grande demais — quebre.
 - Skill `writing-plans` define o formato do plano. Não copiar a estrutura dela para outro lugar.
@@ -119,6 +123,7 @@ Nunca encerrar uma tarefa com teste vermelho.
 
 ## Convenções
 
+- **Quem commita é o dono do repositório, nunca o agente.** Pare no ponto de commit, deixe a árvore num estado coerente e entregue a mensagem pronta para copiar. Não rode `git commit` nem `git push`.
 - **Conventional Commits** obrigatório — `feat:` e `fix:` alimentam o release-please, que gera CHANGELOG, tag e release. Uma versão única para o sistema inteiro.
 - **Nomes de arquivo e de pasta sempre em inglês**, mesmo quando o conteúdo é em português. Exceção só para termo de domínio que não tem tradução honesta (`inscricao-municipal`, `nota-fiscal`) — traduzir esses inventa um conceito que não existe.
 - **Conteúdo de documentação e mensagens de commit em português.** Código, identificadores, comentários e logs em inglês.
