@@ -85,10 +85,13 @@ jobs:
 
       - run: go vet ./...
 
+      # golangci-lint entra como `tool` do go.mod, não como binário pronto da
+      # action: o pré-compilado se recusa a analisar módulo que declare uma
+      # versão de Go maior que a usada para construí-lo, e a nossa sobe sozinha
+      # conforme as dependências pedem. Compilado com o toolchain do repositório,
+      # a divergência não existe — e a versão fica fixada onde as outras estão.
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+        run: go tool golangci-lint run ./...
 
       # Contrato é a fonte: se o gerado estiver atrasado, o PR falha aqui e
       # não em runtime, três semanas depois, com front e back divergindo.

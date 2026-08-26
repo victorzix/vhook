@@ -1,4 +1,4 @@
-.PHONY: up down run generate test test-integration test-race
+.PHONY: up down run generate lint test test-integration test-race
 
 ## up: sobe só a infraestrutura; a api roda local com `make run`
 up:
@@ -13,6 +13,10 @@ run:
 generate:
 	go tool sqlc generate
 	go tool oapi-codegen -config contracts/oapi-codegen.yaml contracts/openapi.yaml
+
+## lint: o mesmo golangci-lint que o CI roda, compilado pelo toolchain do repo
+lint:
+	go tool golangci-lint run ./...
 
 ## test: só unidade — rápido o bastante para rodar a cada green
 test:
