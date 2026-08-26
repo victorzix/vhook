@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | aprovada |
+| **Status** | implementada |
 | **Release alvo** | `v0.1.0` |
 | **Plano** | [`plan.md`](plan.md) |
+| **Resultado** | [`result.md`](result.md) |
 
 ---
 

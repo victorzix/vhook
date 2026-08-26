@@ -34,6 +34,8 @@ Herdadas por toda task. Não repetir dentro delas.
 - Teste de integração é marcado com `if testing.Short() { t.Skip(...) }`. `make test` usa `-short`; `make test-integration` e o CI rodam tudo.
 - **Quem commita é o dono do repositório.** Os passos de commit deste plano entregam a mensagem pronta; não rode `git commit`.
 - Arquivos e pastas em inglês; conteúdo de documentação em português.
+- **Para ver o red num pacote novo, crie antes o arquivo de implementação contendo só a linha `package X`.** Sem nenhum `.go` não-teste, o Go responde `no non-test Go files` e nunca chega a reclamar dos símbolos que faltam — o que esconde justamente a informação que o passo vermelho existe para dar. O stub vazio não é implementação; o corpo só é escrito depois de o red aparecer.
+- **`go mod tidy` depois de todo `go get`, antes de tentar compilar.** Não é só cosmético: `go get` marca a dependência como `// indirect` até algo importá-la, e em pacote com muitas transitivas — `prometheus/client_golang` é o caso — ele grava o `require` sem as somas das transitivas, e a build morre em `missing go.sum entry` antes de rodar teste nenhum.
 
 ---
 
@@ -98,6 +100,8 @@ module github.com/victorzix/vhook
 go 1.24
 ```
 
+A diretiva vai subir sozinha conforme as dependências entram — `testcontainers-go` e `pgx/v5` declaram piso acima de `1.24`, e ao fim da Task 6 ela está em `1.26.0`. Não reverta: é a dependência pedindo, não descuido.
+
 - [ ] **Step 2: Escrever o `docker-compose.yml`**
 
 O serviço `api` **não** entra agora — ele depende do `Dockerfile` e do binário, que só existem na Task 9. Subir um compose que não builda seria deixar o repositório quebrado por oito tasks.
@@ -145,7 +149,7 @@ volumes:
 **As linhas de receita usam TAB, não espaços** — `make` falha com "missing separator" se forem espaços.
 
 ```make
-.PHONY: up down run generate test test-integration
+.PHONY: up down run generate test test-integration test-race
 
 ## up: sobe só a infraestrutura; a api roda local com `make run`
 up:
@@ -163,12 +167,19 @@ generate:
 
 ## test: só unidade — rápido o bastante para rodar a cada green
 test:
-	go test -race -short ./...
+	go test -short ./...
 
-## test-integration: sobe container de verdade; é o que o CI roda
+## test-integration: sobe container de verdade
 test-integration:
-	go test -race -shuffle=on ./...
+	go test -shuffle=on ./...
+
+## test-race: o que o CI roda. Exige CGO_ENABLED=1 e um compilador C, que
+## o Windows não tem por padrão — por isso não é o alvo do dia a dia.
+test-race:
+	CGO_ENABLED=1 go test -race -shuffle=on ./...
 ```
+
+**Por que `-race` não está nos alvos do dia a dia.** O detector de corrida exige `CGO_ENABLED=1` e um compilador C. No Windows não há gcc por padrão, então um `make test` com `-race` falharia sempre, na build, antes de rodar teste nenhum — e alvo que nunca funciona é alvo que se aprende a ignorar. O `-race` continua obrigatório onde importa: `.github/workflows/ci.yml` roda `go test -race -shuffle=on ./...` direto, em Ubuntu, sem passar pelo Makefile.
 
 O alvo `generate` só funciona a partir da Task 6, quando as ferramentas e os arquivos de configuração existirem. Ele nasce agora porque o CI procura por `^generate:` no `Makefile` e sai limpo enquanto não encontra — deixar para depois manteria esse job em silêncio.
 
@@ -747,6 +758,7 @@ func TestDeclaredOverrides(t *testing.T) {
 		{errs.QueueUnavailable, errs.LevelError, http.StatusServiceUnavailable},
 		{errs.Draining, errs.LevelWarn, http.StatusServiceUnavailable},
 		{errs.Internal, errs.LevelError, http.StatusInternalServerError},
+		{errs.MissingConfig, errs.LevelError, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.err.Code, func(t *testing.T) {
@@ -933,8 +945,10 @@ var (
 	Internal = register("SYS-INT-001", TypeINT)
 
 	// MissingConfig never becomes a response: the process exits before the
-	// port opens. It carries a level for the log.
-	MissingConfig = register("CFG-VAL-001", TypeVAL, noHTTPStatus())
+	// port opens. It carries a level for the log, and overrides VAL's warn:
+	// missing configuration is an operator problem, not client input, and
+	// warn on a process that dies before opening the port goes unseen.
+	MissingConfig = register("CFG-VAL-001", TypeVAL, noHTTPStatus(), withLevel(LevelError))
 )
 ```
 
@@ -1904,6 +1918,50 @@ Mensagem:
 chore: gerar tipos do schema e do contrato
 ```
 
+### Os nomes que os geradores realmente produziram
+
+Registrado depois de rodar `generate` de verdade. As Tasks 7 a 9 consomem estes nomes — **não os deduza, use estes.**
+
+```go
+// sqlc
+func New(db DBTX) *Queries                              // *pgxpool.Pool satisfaz DBTX
+func (q *Queries) Ping(ctx context.Context) (int32, error)
+type Event struct { /* … */ Payload pgtype.Text /* … */ }
+
+// oapi-codegen
+type Health struct { Status HealthStatus }
+type Ready  struct { Checks ReadyChecks; Status ReadyStatus }   // Checks vem antes
+type ReadyChecks struct { Postgres ReadyChecksPostgres; Rabbitmq ReadyChecksRabbitmq }
+type Error  struct { Error ErrorBody }
+type ErrorBody struct {
+    Code          ErrorCode
+    CorrelationId string
+    Details       *[]ErrorDetail
+}
+type ErrorCode = string                                  // alias, não tipo nomeado
+type ErrorDetail struct { Code ErrorCode; Field string }
+
+const (
+    HealthStatusOk        HealthStatus        = "ok"
+    ReadyStatusReady      ReadyStatus         = "ready"
+    ReadyChecksPostgresOk ReadyChecksPostgres = "ok"
+    ReadyChecksRabbitmqOk ReadyChecksRabbitmq = "ok"
+)
+
+type ServerInterface interface {
+    GetHealth(w http.ResponseWriter, r *http.Request)
+    GetMetrics(w http.ResponseWriter, r *http.Request)
+    GetReadiness(w http.ResponseWriter, r *http.Request)
+}
+func HandlerFromMux(si ServerInterface, r chi.Router) http.Handler
+```
+
+Três consequências que mudam código das tasks seguintes:
+
+- **Os campos de enum são tipo nomeado, não `string`.** Literal sem tipo (`Status: "ok"`) compila, mas **use a constante gerada**: se o enum do contrato mudar, a constante quebra a build e o literal passa em silêncio. Atribuir uma *variável* `string` não compila sem conversão.
+- **`ErrorCode` é alias de `string`**, então `Code: e.Code` e `Code: openapi.ErrorCode(e.Code)` compilam os dois. A conversão fica por precaução: se um dia o contrato promover o tipo, ela já está no lugar.
+- **`chi` entra como dependência aqui, não na Task 9.** O gerado importa `github.com/go-chi/chi/v5`, então sem ele `go build ./...` falha já na Task 6.
+
 ---
 
 ## Task 7: `internal/obs` — log, correlation e recover
@@ -1927,11 +1985,9 @@ chore: gerar tipos do schema e do contrato
   - `func WriteError(w http.ResponseWriter, r *http.Request, e *errs.Error, details ...openapi.ErrorDetail)`
   - Constantes `HeaderCorrelationID = "X-Vhook-Correlation-Id"` e `HeaderClientCorrelationID = "X-Correlation-Id"`
 
-- [ ] **Step 1: Adicionar a dependência de chi**
+- [ ] **Step 1: Conferir a dependência de chi**
 
-```bash
-go get github.com/go-chi/chi/v5@latest
-```
+Ela já entrou na Task 6 — o código gerado pelo `oapi-codegen` importa `github.com/go-chi/chi/v5`. Confirme com `grep chi go.mod` e só rode `go get github.com/go-chi/chi/v5@latest` se estiver faltando.
 
 - [ ] **Step 2: Escrever os testes que falham**
 
@@ -2764,7 +2820,7 @@ func (h *Health) Drain() { h.draining.Store(true) }
 // GetHealth is liveness. It never touches a dependency: a blip in Postgres
 // must not make an orchestrator kill a healthy process.
 func (h *Health) GetHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, openapi.Health{Status: "ok"})
+	writeJSON(w, http.StatusOK, openapi.Health{Status: openapi.HealthStatusOk})
 }
 
 // GetReadiness probes every dependency in a fixed order.
@@ -2806,8 +2862,11 @@ func (h *Health) GetReadiness(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, openapi.Ready{
-		Status: "ready",
-		Checks: openapi.ReadyChecks{Postgres: "ok", Rabbitmq: "ok"},
+		Status: openapi.ReadyStatusReady,
+		Checks: openapi.ReadyChecks{
+			Postgres: openapi.ReadyChecksPostgresOk,
+			Rabbitmq: openapi.ReadyChecksRabbitmqOk,
+		},
 	})
 }
 
@@ -3535,7 +3594,8 @@ Em `CLAUDE.md`, substitua a seção `## Comandos`:
 | `make run` | sobe a `api`, aplicando migrations no boot |
 | `make generate` | regenera sqlc e oapi-codegen; o CI falha se o commitado estiver atrasado |
 | `make test` | só unidade, com `-short` |
-| `make test-integration` | tudo, subindo container de verdade — é o que o CI roda |
+| `make test-integration` | tudo, subindo container de verdade |
+| `make test-race` | o que o CI roda; exige `CGO_ENABLED=1` e um compilador C |
 
 Copie `.env.example` para `.env` antes do primeiro `make run`.
 ```
