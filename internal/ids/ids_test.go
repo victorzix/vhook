@@ -123,7 +123,7 @@ func TestNewProducesVersion7(t *testing.T) {
 func TestRenderPreservesTimeOrder(t *testing.T) {
 	early := ids.Render(uuid.MustParse("018f4c2a-7b31-7c4e-9a2b-1f5c8d3e6b04"))
 	late := ids.Render(uuid.MustParse("01912d4e-8f00-7000-8000-000000000001"))
-	if !(early < late) {
+	if early >= late {
 		t.Errorf("ordem lexicográfica quebrou: %q não é menor que %q", early, late)
 	}
 }

@@ -16,7 +16,7 @@ func tableNames(t *testing.T, ctx context.Context, url string) map[string]bool {
 	if err != nil {
 		t.Fatalf("conectar: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(ctx, `
 		SELECT tablename FROM pg_tables
@@ -43,7 +43,7 @@ func indexNames(t *testing.T, ctx context.Context, url string) map[string]bool {
 	if err != nil {
 		t.Fatalf("conectar: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	rows, err := conn.Query(ctx,
 		`SELECT indexname FROM pg_indexes WHERE schemaname = 'public'`)

@@ -39,7 +39,7 @@ func run(ctx context.Context, databaseURL string, direction func(*migrate.Migrat
 	if err != nil {
 		return fmt.Errorf("store: open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.PingContext(ctx); err != nil {
 		return errors.Join(errs.StorageUnavailable, fmt.Errorf("store: ping: %w", err))
