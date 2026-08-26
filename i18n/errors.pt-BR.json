@@ -1,0 +1,7 @@
+{
+  "CFG-VAL-001": "Configuração obrigatória ausente.",
+  "QUE-DEP-001": "Fila de mensagens indisponível.",
+  "STO-DEP-001": "Banco de dados indisponível.",
+  "SYS-DEP-001": "Serviço em desligamento. Tente novamente.",
+  "SYS-INT-001": "Falha interna inesperada."
+}

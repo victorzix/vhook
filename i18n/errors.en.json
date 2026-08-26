@@ -1,0 +1,7 @@
+{
+  "CFG-VAL-001": "Required configuration is missing.",
+  "QUE-DEP-001": "Message queue unavailable.",
+  "STO-DEP-001": "Database unavailable.",
+  "SYS-DEP-001": "Service is shutting down. Try again.",
+  "SYS-INT-001": "Unexpected internal failure."
+}

@@ -1,0 +1,7 @@
+{
+  "CFG-VAL-001": "Falta configuración obligatoria.",
+  "QUE-DEP-001": "Cola de mensajes no disponible.",
+  "STO-DEP-001": "Base de datos no disponible.",
+  "SYS-DEP-001": "El servicio se está apagando. Inténtelo de nuevo.",
+  "SYS-INT-001": "Fallo interno inesperado."
+}
