@@ -2,11 +2,13 @@
 
 Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadastrados, com assinatura HMAC, timeout agressivo, retry com backoff exponencial e DLQ.
 
-**Estado: design fechado, nenhum código escrito.** O próximo passo é a **primeira spec** — e ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
+**Estado: [spec 001](docs/specs/platform/001-walking-skeleton/spec.md) implementada — o esqueleto anda.** A `api` sobe com migrations no boot, o schema completo existe, os contratos geram tipos, o registro de erros e os catálogos de locale estão de pé, e `/healthz`, `/readyz` e `/metrics` respondem.
 
-Pendente, em ordem: primeira spec · `docker-compose.yml` e `Makefile` · CD no Coolify apontando para o repo · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
+Próxima spec: **`endpoints` — cadastro**, que é pré-requisito de ingress porque uma `delivery` só existe se houver endpoint (§4.5). Ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
 
-**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 30 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
+Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html`, que está atrasado em relação a §4.31 e §4.32 · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
+
+**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 32 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
 
 ## Stack fechada
 
@@ -160,4 +162,14 @@ Secrets usados pelo release, ambos opcionais: `VHOOK_INGRESS_URL` e `VHOOK_INGRE
 
 ## Comandos
 
-Nada ainda. Preencher quando o `Makefile` e o `docker-compose.yml` existirem — o CI espera um alvo `generate` no Makefile para checar o código gerado.
+| Comando | O que faz |
+|---|---|
+| `make up` | sobe Postgres e RabbitMQ; a `api` roda local |
+| `make down` | derruba a infraestrutura |
+| `make run` | sobe a `api`, aplicando migrations no boot |
+| `make generate` | regenera sqlc e oapi-codegen; o CI falha se o commitado estiver atrasado |
+| `make test` | só unidade, com `-short` |
+| `make test-integration` | tudo, subindo container de verdade |
+| `make test-race` | o que o CI roda; exige `CGO_ENABLED=1` e um compilador C |
+
+Copie `.env.example` para `.env` antes do primeiro `make run`.
