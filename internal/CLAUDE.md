@@ -2,11 +2,11 @@
 
 ## Stack fechada
 
-Go · pgx + sqlc · amqp091-go · `net/http` com `ServeMux` · oapi-codegen · slog · prometheus/client_golang · testcontainers-go.
+Go · pgx + sqlc · amqp091-go · `go-chi/chi/v5` · oapi-codegen · slog · prometheus/client_golang · testcontainers-go.
 
 Duas escolhas foram minhas, não suas, e sinalizo:
 
-- **Roteador é a stdlib.** O `ServeMux` do Go 1.22+ faz roteamento por método e path com wildcard, que é tudo que este projeto precisa. Chi ou Echo entrariam para resolver problema que não temos.
+- **Roteador é `chi`.** O que decide é §4.21: duas superfícies com middleware de autenticação distinto no mesmo processo, que em `chi.Group` são três linhas. Middleware é `func(http.Handler) http.Handler` puro e não existe tipo de contexto próprio, então nada da biblioteca aparece na assinatura de handler nenhum — a dependência fica confinada ao `main.go`. Echo e Gin foram descartados exatamente por não terem essa propriedade.
 - **Validação de request vem do contrato.** O middleware do oapi-codegen valida corpo e parâmetros contra `openapi.yaml` antes do handler. Validar à mão significaria escrever duas vezes a mesma regra e deixá-las divergir.
 
 ## Layout por domínio
@@ -20,11 +20,18 @@ internal/
 ├── queue/       porta + adapter Rabbit
 ├── dispatch/    cliente HTTP, HMAC, guard de SSRF, timeout
 ├── store/       sqlc gerado, pool, advisory locks
+├── openapi/     tipos GERADOS de contracts/openapi.yaml — nunca editar
+├── ids/         UUIDv7 ↔ prefixo_base32
 ├── errs/        registro de erros
-└── obs/         slog e métricas
+└── obs/         slog, métricas e handlers de health
 ```
 
 Espelha `docs/specs/<domínio>/`: uma spec de endpoints toca uma pasta.
+
+Os quatro de baixo não são domínio, são capacidade transversal. Dois deles merecem nota:
+
+- **`ids` não cabe em `core`** justamente pela regra de `core`: o encoder precisa de uma biblioteca de UUID. É puro e sem I/O, mas não é domínio.
+- **`obs` guarda os handlers de `/healthz` e `/readyz`**, além de `/metrics`. Liveness, readiness e métrica são a mesma superfície operacional, e nenhuma tem domínio a que pertencer. O router é montado em `cmd/api/main.go`, não dentro de um pacote.
 
 **Direção das dependências, e ela é de mão única:** pacote de domínio importa capacidade; **capacidade nunca importa domínio**. Se `queue` precisar importar `delivery`, a porta está no lugar errado.
 

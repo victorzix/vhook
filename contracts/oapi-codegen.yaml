@@ -1,0 +1,8 @@
+package: openapi
+output: internal/openapi/openapi.gen.go
+output-options:
+  skip-prune: true
+generate:
+  models: true
+  chi-server: true
+  embedded-spec: false

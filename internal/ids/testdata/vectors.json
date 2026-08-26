@@ -1,0 +1,22 @@
+[
+  {
+    "name": "zero",
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "base32": "00000000000000000000000000"
+  },
+  {
+    "name": "max",
+    "uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    "base32": "7ZZZZZZZZZZZZZZZZZZZZZZZZZ"
+  },
+  {
+    "name": "v7-may-2024",
+    "uuid": "018f4c2a-7b31-7c4e-9a2b-1f5c8d3e6b04",
+    "base32": "01HX62MYSHFH79MARZBJ6KWTR4"
+  },
+  {
+    "name": "v7-july-2024",
+    "uuid": "01912d4e-8f00-7000-8000-000000000001",
+    "base32": "01J4PMX3R0E008000000000001"
+  }
+]

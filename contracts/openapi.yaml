@@ -13,11 +13,66 @@ info:
     O consumidor traduz o código pelo catálogo. Ver `docs/ERRORS.md`.
 
 servers:
-  - url: http://localhost:8080/v1
+  - url: http://localhost:8080
     description: desenvolvimento
 
+# O servidor é a raiz, não `/v1`: as rotas operacionais abaixo vivem fora do
+# prefixo de versão, e um servidor com `/v1` embutido não conseguiria descrevê-las
+# sem sobrescrita por caminho — que o gerador de servidor ignora.
+#
 # As operações são adicionadas pela spec que as introduz.
-paths: {}
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness
+      description: |
+        Diz apenas que o processo responde. **Nunca consulta dependência** — um
+        blip do Postgres não pode fazer o orquestrador matar um processo saudável.
+        Prontidão é `/readyz`.
+      security: []
+      responses:
+        '200':
+          description: O processo está vivo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Readiness
+      description: |
+        Verifica as dependências em ordem fixa — `postgres`, depois `rabbitmq` —
+        com timeout de 2s cada. Passa a responder 503 assim que o sinal de
+        término chega, antes de o servidor parar de aceitar conexão.
+      security: []
+      responses:
+        '200':
+          description: Pronta para servir
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ready'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Métricas Prometheus
+      description: |
+        Formato de exposição Prometheus. Coletas padrão do runtime Go mais
+        `vhook_build_info{version,commit}`. Nenhuma métrica leva `application_id`.
+      security: []
+      responses:
+        '200':
+          description: Métricas no formato de exposição Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
 
 components:
   securitySchemes:
@@ -55,6 +110,45 @@ components:
         Paginação keyset sobre `(created_at, id)`. Opaco para o cliente.
 
   schemas:
+    Health:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    Ready:
+      type: object
+      required: [status, checks]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        checks:
+          $ref: '#/components/schemas/ReadyChecks'
+
+    ReadyChecks:
+      type: object
+      required: [postgres, rabbitmq]
+      additionalProperties: false
+      description: |
+        Só aparece na resposta 200, e aí todas as dependências estão `ok`.
+        Falha é expressa pelo envelope de erro: o `code` é o da primeira
+        dependência a falhar na ordem de checagem, e `details` lista todas.
+
+        Schema nomeado em vez de objeto embutido para que o nome do tipo
+        gerado seja previsível — objeto anônimo faz o gerador inventar o nome.
+      properties:
+        postgres:
+          type: string
+          enum: [ok]
+        rabbitmq:
+          type: string
+          enum: [ok]
+
     ErrorCode:
       type: string
       pattern: '^[A-Z]{3}-[A-Z]{3}-[0-9]{3}$'
@@ -64,41 +158,50 @@ components:
         `MOD-TYP-NNN`. Contrato estável — pode ser usado em lógica de decisão.
         Ver `docs/ERRORS.md` para a taxonomia.
 
+    ErrorDetail:
+      type: object
+      required: [field, code]
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          description: |
+            Campo do formulário, ou nome da sub-checagem quando o erro tem
+            partes — em `/readyz`, `postgres` ou `rabbitmq`.
+          examples:
+            - url
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+
+    ErrorBody:
+      type: object
+      required: [code, correlation_id]
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        correlation_id:
+          type: string
+          description: |
+            Liga esta resposta ao log estruturado. Obrigatório: como não
+            há mensagem, é a única forma de investigar um caso relatado.
+          examples:
+            - 01HQZX3K7YB2N4M8P6R9T5V0W1
+        details:
+          type: array
+          description: |
+            Falhas por campo, para o dashboard destacar o formulário sem
+            que o backend produza texto. Ausente quando não se aplica.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+
     Error:
       type: object
       required: [error]
       additionalProperties: false
       properties:
         error:
-          type: object
-          required: [code, correlation_id]
-          additionalProperties: false
-          properties:
-            code:
-              $ref: '#/components/schemas/ErrorCode'
-            correlation_id:
-              type: string
-              description: |
-                Liga esta resposta ao log estruturado. Obrigatório: como não
-                há mensagem, é a única forma de investigar um caso relatado.
-              examples:
-                - 01HQZX3K7YB2N4M8P6R9T5V0W1
-            details:
-              type: array
-              description: |
-                Falhas por campo, para o dashboard destacar o formulário sem
-                que o backend produza texto. Ausente quando não se aplica.
-              items:
-                type: object
-                required: [field, code]
-                additionalProperties: false
-                properties:
-                  field:
-                    type: string
-                    examples:
-                      - url
-                  code:
-                    $ref: '#/components/schemas/ErrorCode'
+          $ref: '#/components/schemas/ErrorBody'
 
   responses:
     Unauthorized:
@@ -117,6 +220,16 @@ components:
 
     TooManyRequests:
       description: Limite de rate ou quota do plano excedido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ServiceUnavailable:
+      description: |
+        Dependência própria indisponível, ou desligamento em andamento.
+        503 e não o 502 padrão do tipo `DEP`: 502 significa "recebi resposta ruim
+        de um upstream", e aqui o caso é "não estou pronta para servir".
       content:
         application/json:
           schema:

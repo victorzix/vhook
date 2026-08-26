@@ -1,0 +1,7 @@
+{
+  "CFG-VAL-001": "Configuration obligatoire manquante.",
+  "QUE-DEP-001": "File de messages indisponible.",
+  "STO-DEP-001": "Base de données indisponible.",
+  "SYS-DEP-001": "Service en cours d'arrêt. Réessayez.",
+  "SYS-INT-001": "Échec interne inattendu."
+}

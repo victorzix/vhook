@@ -1,0 +1,14 @@
+version: "2"
+sql:
+  - engine: postgresql
+    # Só o arquivo de tabelas: os .down.sql derrubariam o modelo, e a
+    # 000002 é plpgsql, que o parser do sqlc não precisa entender.
+    schema: migrations/000001_initial_schema.up.sql
+    queries: internal/store/queries
+    gen:
+      go:
+        package: sqlc
+        out: internal/store/sqlc
+        sql_package: pgx/v5
+        emit_json_tags: false
+        emit_empty_slices: true
