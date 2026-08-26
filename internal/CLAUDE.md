@@ -20,6 +20,7 @@ internal/
 ├── queue/       porta + adapter Rabbit
 ├── dispatch/    cliente HTTP, HMAC, guard de SSRF, timeout
 ├── store/       sqlc gerado, pool, advisory locks
+├── openapi/     tipos GERADOS de contracts/openapi.yaml — nunca editar
 ├── ids/         UUIDv7 ↔ prefixo_base32
 ├── errs/        registro de erros
 └── obs/         slog, métricas e handlers de health

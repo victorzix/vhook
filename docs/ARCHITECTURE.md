@@ -2,7 +2,7 @@
 
 Documento de decisões. Cada seção segue o mesmo formato: **o que foi decidido**, **por quê**, e **o que se abriu mão em troca**. Onde uma alternativa foi descartada, ela está registrada com o motivo — decisão sem alternativa descartada não é decisão, é default.
 
-> Status: design fechado, implementação não iniciada.
+> Status: implementação iniciada. A [spec 001](specs/platform/001-walking-skeleton/spec.md) entregou o esqueleto — schema, contratos gerando tipos, registro de erros e a `api` com os três endpoints operacionais. §4.31 e §4.32 nasceram dela.
 
 ---
 
@@ -393,6 +393,7 @@ vhook/
 │   ├── queue/      porta + adapter Rabbit  ← isola o degrau 4 (§5)
 │   ├── dispatch/   cliente HTTP, HMAC, guard de SSRF, timeout
 │   ├── store/      Postgres via sqlc
+│   ├── openapi/    tipos GERADOS de contracts/openapi.yaml — nunca editar
 │   ├── ids/        UUIDv7 ↔ prefixo_base32 (§4.31)
 │   ├── errs/       registro de erros: código, nível, status HTTP
 │   └── obs/        slog, métricas e handlers de health
