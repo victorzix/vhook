@@ -766,6 +766,15 @@ func TestIsForbiddenAddr(t *testing.T) {
 		// e a conexão acaba em 10.0.0.1.
 		{"::ffff:10.0.0.1", true, "IPv4 privado mapeado em IPv6"},
 		{"::ffff:169.254.169.254", true, "link-local mapeado em IPv6"},
+		// Estes dois são os que realmente dependem do Unmap() da nossa
+		// implementação. Os predicados do net/netip — IsPrivate, IsLoopback,
+		// IsLinkLocalUnicast — já desmapeiam 4-em-6 por dentro, então os dois
+		// casos acima passariam mesmo sem a linha. Já IsUnspecified não
+		// desmapeia, e os prefixos de CGNAT e 0.0.0.0/8 estão atrás de uma
+		// guarda Is4(), falsa para 4-em-6. Sem estes casos, apagar o Unmap()
+		// num refactor não produziria nenhum teste vermelho.
+		{"::ffff:100.64.0.1", true, "CGNAT mapeado: a guarda Is4() falha sem Unmap"},
+		{"::ffff:0.0.0.0", true, "não roteável mapeado: IsUnspecified não desmapeia"},
 
 		{"1.1.1.1", false, "público"},
 		{"172.32.0.1", false, "fora do bloco RFC1918"},
@@ -1075,10 +1084,16 @@ Esperado: PASS em todos, com os 17 subtestes de `TestIsForbiddenAddr` visíveis.
 Remova temporariamente a linha `addr = addr.Unmap()`:
 
 ```bash
-go test ./internal/dispatch/ -run 'TestIsForbiddenAddr/::ffff:' -v
+go test ./internal/dispatch/ -run 'TestIsForbiddenAddr/::ffff' -v
 ```
 
-Esperado: FAIL nos dois subtestes de IPv4 mapeado. **Restaure a linha e rode até PASS.** É a linha mais fácil de remover num refactor achando que é redundante.
+Esperado: FAIL em **`::ffff:100.64.0.1` e `::ffff:0.0.0.0`**, e PASS nos outros dois casos mapeados. **Restaure a linha e rode até PASS.**
+
+**Por que só esses dois falham, e por que isso importa.** Os predicados do `net/netip` — `IsPrivate`, `IsLoopback`, `IsLinkLocalUnicast`, `IsMulticast` — abrem todos com `if ip.Is4In6() { ip = ip.Unmap() }`. Então `::ffff:10.0.0.1` e `::ffff:169.254.169.254` são bloqueados pela stdlib mesmo sem a nossa linha.
+
+Quem depende dela é o resto: `IsUnspecified` **não** desmapeia, e os dois prefixos explícitos — CGNAT e `0.0.0.0/8` — estão atrás de uma guarda `addr.Is4()`, que é falsa para um endereço 4-em-6.
+
+Isso quer dizer que uma tabela de teste sem esses dois casos **não protege a linha**: um refactor a apaga e tudo segue verde. É o modo de falha exato que este passo existe para impedir, e ele só é reproduzível com os casos certos.
 
 - [ ] **Step 6: Commit**
 
@@ -1466,6 +1481,34 @@ Onde a regra mora. O teste que importa é o de concorrência: sem ele, contagem 
   - `func (s *Service) UpdateURL(ctx context.Context, appID, endpointID uuid.UUID, url string) (Endpoint, error)`
 
 `Endpoint` é struct de **domínio**, escrito à mão — nunca o row do sqlc nem o tipo gerado do OpenAPI. `internal/CLAUDE.md`: *"Nunca um struct que serve a duas dessas funções."* `Secret` vem preenchido em `Create` e `Get`, vazio em `List` e `UpdateURL`.
+
+### O que o `sqlc` gerou de fato — verificado na Task 6, não é previsão
+
+```go
+func (q *Queries) LockApplication(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
+func (q *Queries) CountEndpoints(ctx context.Context, applicationID pgtype.UUID) (int64, error)
+func (q *Queries) ListEndpoints(ctx context.Context, applicationID pgtype.UUID) ([]Endpoint, error)
+
+type CreateEndpointParams    struct{ ID, ApplicationID pgtype.UUID; Url string; SecretEncrypted []byte }
+type GetEndpointParams       struct{ ID, ApplicationID pgtype.UUID }
+type UpdateEndpointURLParams struct{ ID, ApplicationID pgtype.UUID; Url string }
+
+type Endpoint struct {
+    ID, ApplicationID   pgtype.UUID
+    Url                 string
+    SecretEncrypted     []byte
+    Status              string
+    ConsecutiveFailures int32
+    DisabledAt, CreatedAt, UpdatedAt pgtype.Timestamptz
+}
+```
+
+Quatro pontos que mudam o código do repo:
+
+- **`Url`, não `URL`**, e `SecretEncrypted` é `[]byte` — encaixa direto na saída de `secrets.Seal`.
+- **`CountEndpoints`, `ListEndpoints` e `LockApplication` recebem parâmetro solto**, não struct. Só as outras três têm `...Params`.
+- **`LockApplication` é `:one`**, então application inexistente devolve `pgx.ErrNoRows` — é assim que o service cunha `APP-NFD-001` sem precisar de query extra.
+- **`CreatedAt` é `pgtype.Timestamptz`**, então o domínio lê `row.CreatedAt.Time`.
 
 - [ ] **Step 1: Escrever os testes**
 
@@ -2135,8 +2178,28 @@ feat: cadastrar endpoint com secret cifrado
 **Files:**
 - Create: `internal/endpoints/handler.go`
 - Create: `cmd/api/endpoints_test.go`
-- Modify: `cmd/api/server.go`, `cmd/api/config.go`, `cmd/api/config_test.go`, `cmd/api/main.go`
-- Modify: `.env.example`, `CLAUDE.md`
+- Modify: `cmd/api/server.go`, `cmd/api/config.go`, `cmd/api/config_test.go`, `cmd/api/main.go`, `cmd/api/server_test.go`
+- Modify: `internal/obs/health_test.go`
+- Modify: `.env.example`, `CLAUDE.md`, `go.mod`, `go.sum`
+
+### O que a Task 5 descobriu, e que muda esta task
+
+Estes são **fatos verificados no gerado**, não previsão. Use-os:
+
+- **`ApplicationId` e `EndpointId` são `= string`**, alias e não tipo nomeado. Não há conversão a fazer — e não há checagem de tipo: passar um id de application onde se espera o de endpoint **compila**. É o parse por prefixo do `internal/ids` que pega isso em runtime.
+- **Os parâmetros de caminho chegam como argumentos posicionais** depois de `r`, na ordem da URL. Não existe struct `...Params`, e o wrapper gerado já fez o bind: nada de `chi.URLParam` no handler.
+- **A função do spec embutido é `openapi.GetSpec()`.** `GetSwagger()` existe mas está **deprecada**.
+- **`EndpointStatus` gerou constantes sem prefixo de tipo**: `openapi.Active` e `openapi.Disabled`. Nomes genéricos — cuidado com colisão.
+- **`nethttp-middleware` foi removido do `go.mod` pelo `go mod tidy`** da Task 5, porque nada o importava ainda. **Rode `go get github.com/oapi-codegen/nethttp-middleware@v1.2.0` no começo desta task.** O módulo está no cache local.
+- **`ChiServerOptions.ErrorHandlerFunc` tem a forma `func(w http.ResponseWriter, r *http.Request, err error)`.** Sem ela, o default responde `http.Error(w, err.Error(), 400)` — texto livre e fora do envelope de erro do projeto. O erro entregue é `*openapi.InvalidParamFormatError`.
+- **`nethttpmiddleware.Options` tem `ErrorHandler func(w, message string, statusCode int)` e `ErrorHandlerWithOpts`**, que recebe o `error` e tem precedência. Prefira o segundo. Há também `SilenceServersWarning` e `DoNotValidateServers`.
+- **O middleware entra em pânico** se `gorillamux.NewRouter(spec)` falhar. Construir o spec no boot, e não por requisição, mantém isso no caminho de inicialização.
+
+### Um buraco do plano que a Task 5 expôs
+
+`internal/obs/health_test.go` tem `TestHealthSatisfiesTheGeneratedInterface`, escrito pela spec 001 quando o contrato tinha três operações. Com sete, **`*obs.Health` sozinho nunca mais satisfaz `openapi.ServerInterface`**, e o pacote deixa de compilar.
+
+O teste não estava errado — a asserção é que **alguém** satisfaz o contrato, e esse alguém passou a ser o `apiServer` composto. **Mova-o**: remova de `internal/obs/health_test.go` e recrie em `cmd/api`, afirmando sobre `apiServer`. Deletar sem recriar perderia a garantia de que o handler continua casando com o contrato gerado — que é justamente o que o teste vale.
 
 **Interfaces:**
 - Produces: `func endpoints.NewHandler(svc *Service) *Handler`, com os quatro métodos de `openapi.ServerInterface`
@@ -2328,13 +2391,10 @@ type apiServer struct {
 }
 
 func newRouter(logger *slog.Logger, health *obs.Health, h *endpoints.Handler, adminToken string) (http.Handler, error) {
-	spec, err := openapi.GetSwagger()
+	spec, err := openapi.GetSpec()
 	if err != nil {
 		return nil, fmt.Errorf("api: load spec: %w", err)
 	}
-	// The servers block is for documentation; leaving it in makes the
-	// validator reject paths that do not carry the declared prefix.
-	spec.Servers = nil
 
 	r := chi.NewRouter()
 	r.Use(obs.Correlation)
@@ -2348,10 +2408,13 @@ func newRouter(logger *slog.Logger, health *obs.Health, h *endpoints.Handler, ad
 		Options: openapi3filter.Options{
 			AuthenticationFunc: httpauth.Authenticator(adminToken),
 		},
-		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, message string, statusCode int) {
-			// The validator's own message never reaches the client: our error
-			// envelope carries a code and a correlation id, never text.
-			if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden {
+		// The servers block is documentation; validating against it would
+		// reject every request that does not carry the declared prefix.
+		DoNotValidateServers: true,
+		// The validator's own message never reaches the client: our error
+		// envelope carries a code and a correlation id, never text.
+		ErrorHandlerWithOpts: func(_ context.Context, err error, w http.ResponseWriter, r *http.Request, opts nethttpmiddleware.ErrorHandlerOpts) {
+			if opts.StatusCode == http.StatusUnauthorized || opts.StatusCode == http.StatusForbidden {
 				obs.WriteError(w, r, errs.InvalidCredentials)
 				return
 			}
@@ -2359,11 +2422,18 @@ func newRouter(logger *slog.Logger, health *obs.Health, h *endpoints.Handler, ad
 		},
 	}))
 
-	return openapi.HandlerFromMux(apiServer{Health: health, Handler: h}, r), nil
+	// Without this the generated wrapper answers a bad path parameter with
+	// http.Error and free text, outside the error envelope.
+	return openapi.HandlerWithOptions(apiServer{Health: health, Handler: h}, openapi.ChiServerOptions{
+		BaseRouter: r,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, _ error) {
+			obs.WriteError(w, r, errs.MalformedID)
+		},
+	}), nil
 }
 ```
 
-**A assinatura de `ErrorHandlerFunc` e o nome de `OapiRequestValidatorWithOptions` são previsão.** Leia o pacote e adapte.
+**Confira a forma de `ErrorHandlerOpts` e de `HandlerWithOptions` no pacote antes de escrever.** A Task 5 verificou os nomes, mas não exercitou estes dois — adapte ao que existir e reporte.
 
 Em `main.go`, construa `secrets.NewCipher`, `dispatch.NewURLGuard(net.DefaultResolver, cfg.ssrfAllowlist)`, `endpoints.NewService` e `endpoints.NewHandler`, e passe para `newRouter`.
 
