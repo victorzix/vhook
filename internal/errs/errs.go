@@ -91,4 +91,12 @@ var (
 	// VAL's warn — a boot the operator has to fix is not a client mistake.
 	MissingConfig = register("CFG-VAL-001", TypeVAL,
 		noHTTPStatus(), withLevel(LevelError))
+
+	// AlreadyBootstrapped: the bootstrap command refuses to run twice. The
+	// plaintext key exists only at the moment it is generated, so a second run
+	// that silently recreated would orphan the previous application.
+	AlreadyBootstrapped = register("APP-CFL-001", TypeCFL)
+
+	// InvalidArgument: a CLI flag carries a value outside the allowed set.
+	InvalidArgument = register("APP-VAL-001", TypeVAL)
 )

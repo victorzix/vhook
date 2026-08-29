@@ -1,4 +1,6 @@
 {
+  "APP-CFL-001": "O bootstrap já foi executado nesta instalação.",
+  "APP-VAL-001": "Valor inválido para um dos argumentos.",
   "CFG-VAL-001": "Configuração obrigatória ausente.",
   "QUE-DEP-001": "Fila de mensagens indisponível.",
   "STO-DEP-001": "Banco de dados indisponível.",

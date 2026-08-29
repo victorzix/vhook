@@ -1,4 +1,6 @@
 {
+  "APP-CFL-001": "Bootstrap has already run on this installation.",
+  "APP-VAL-001": "Invalid value for one of the arguments.",
   "CFG-VAL-001": "Required configuration is missing.",
   "QUE-DEP-001": "Message queue unavailable.",
   "STO-DEP-001": "Database unavailable.",
