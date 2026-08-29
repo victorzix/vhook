@@ -62,9 +62,14 @@ func run(logger *slog.Logger) error {
 	// Check order decides which code leads a 503, so it is fixed here.
 	health := obs.NewHealth(logger, postgresCheck(pool), rabbitCheck(cfg.rabbitURL))
 
+	router, err := buildRouter(logger, health, pool, cfg)
+	if err != nil {
+		return err
+	}
+
 	server := &http.Server{
 		Addr:              cfg.httpAddr,
-		Handler:           newRouter(logger, health),
+		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

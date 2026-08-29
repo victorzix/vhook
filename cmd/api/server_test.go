@@ -17,8 +17,18 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/victorzix/vhook/internal/obs"
+	"github.com/victorzix/vhook/internal/openapi"
 	"github.com/victorzix/vhook/internal/store"
 )
+
+// A asserção que vivia em internal/obs até a spec 003: alguém tem de casar
+// com a ServerInterface gerada, e com sete operações no contrato esse alguém
+// é o apiServer composto, não mais o *obs.Health sozinho. Sem ela, uma rota
+// nova no contrato deixaria de ser erro de compilação e viraria 501 em
+// produção.
+func TestTheAPIServerSatisfiesTheGeneratedInterface(t *testing.T) {
+	var _ openapi.ServerInterface = apiServer{}
+}
 
 func TestServerAnswersTheThreeOperationalRoutes(t *testing.T) {
 	if testing.Short() {
@@ -66,7 +76,10 @@ func TestServerAnswersTheThreeOperationalRoutes(t *testing.T) {
 	logger := obs.NewLogger(io.Discard, slog.LevelError)
 	obs.RegisterBuildInfo("v0.0.0-test", "test")
 	health := obs.NewHealth(logger, postgresCheck(pool), rabbitCheck(amqpURL))
-	router := newRouter(logger, health)
+	router, err := buildRouter(logger, health, pool, testConfig(dbURL, amqpURL))
+	if err != nil {
+		t.Fatalf("buildRouter() error = %v", err)
+	}
 
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)

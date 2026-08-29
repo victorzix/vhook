@@ -2,9 +2,9 @@
 
 Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadastrados, com assinatura HMAC, timeout agressivo, retry com backoff exponencial e DLQ.
 
-**Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md) e [002](docs/specs/platform/002-tenancy-bootstrap/spec.md) implementadas.** A `api` sobe com migrations no boot, o schema existe, os contratos geram tipos, o registro de erros e os catálogos de locale estão de pé, `/healthz`, `/readyz` e `/metrics` respondem, e o `adminctl` cria a primeira organização e application com api key utilizável.
+**Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md), [002](docs/specs/platform/002-tenancy-bootstrap/spec.md) e [003](docs/specs/endpoints/003-endpoint-registration/spec.md) implementadas.** A `api` sobe com migrations no boot, `/healthz`, `/readyz` e `/metrics` respondem, o `adminctl` cria a primeira organização e application com api key utilizável, e as rotas de cadastro de endpoint estão de pé — com secret cifrado, validação de SSRF e autenticação de management vinda do contrato.
 
-Em revisão: **[spec 003](docs/specs/endpoints/003-endpoint-registration/spec.md) — cadastro de endpoints**, que traz junto a primeira autenticação de management. É pré-requisito de ingress, porque uma `delivery` só existe se houver endpoint (§4.5).
+Próxima spec: **`ingress` — recebimento de evento**, que agora tem tudo de que precisa: application para autenticar e endpoint para o qual gerar `deliveries`. Ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
 
 Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html` como Artifact — o HTML já está atualizado, falta publicar · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
 
@@ -167,11 +167,11 @@ Secrets usados pelo release, ambos opcionais: `VHOOK_INGRESS_URL` e `VHOOK_INGRE
 | `make up` | sobe Postgres e RabbitMQ; a `api` roda local |
 | `make down` | derruba a infraestrutura |
 | `make run` | sobe a `api`, aplicando migrations no boot |
-| `go run ./cmd/adminctl genkey` | gera uma `VHOOK_MASTER_KEY` |
+| `go run ./cmd/adminctl genkey` | gera um segredo aleatório de 32 bytes em base64 — serve para `VHOOK_MASTER_KEY` e para `VHOOK_ADMIN_TOKEN` |
 | `go run ./cmd/adminctl bootstrap` | cria a primeira organização e application, e imprime a api key uma única vez |
 | `make generate` | regenera sqlc e oapi-codegen; o CI falha se o commitado estiver atrasado |
 | `make test` | só unidade, com `-short` |
 | `make test-integration` | tudo, subindo container de verdade |
 | `make test-race` | o que o CI roda; exige `CGO_ENABLED=1` e um compilador C |
 
-Copie `.env.example` para `.env` antes do primeiro `make run`.
+Copie `.env.example` para `.env` antes do primeiro `make run`. A `api` não sobe sem `VHOOK_MASTER_KEY` e `VHOOK_ADMIN_TOKEN`: ela sai com `CFG-VAL-001` antes de abrir a porta.

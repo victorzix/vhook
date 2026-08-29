@@ -210,6 +210,6 @@ func TestMetricsExposesBuildInfoAndNoTenantLabel(t *testing.T) {
 	}
 }
 
-func TestHealthSatisfiesTheGeneratedInterface(t *testing.T) {
-	var _ openapi.ServerInterface = newTestHealth(t)
-}
+// A asserção de que alguém satisfaz openapi.ServerInterface mudou de casa:
+// com sete operações no contrato, *obs.Health sozinho nunca mais a satisfaz.
+// Ela vive em cmd/api, sobre o apiServer composto.
