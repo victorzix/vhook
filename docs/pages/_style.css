@@ -281,7 +281,17 @@ h2 {
   color: inherit;
 }
 a.card:hover { border-color: var(--accent); }
-.card-name { font-family: var(--mono); font-size: 0.93rem; font-weight: 600; color: var(--accent); margin: 0; }
+.card-name {
+  font-family: var(--mono);
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
 .card-body { margin: 0; font-size: 0.9rem; color: var(--ink-soft); }
 .card-foot {
   margin: 0;
@@ -335,6 +345,53 @@ a.card:hover { border-color: var(--accent); }
   background: var(--surface);
 }
 .chip b { color: var(--ink); font-weight: 600; }
+
+/* ---- implementation state ----
+
+   Duas categorias, nunca três: ou existe e roda, ou está decidido e não foi
+   construído. "parcial" seria ambíguo justamente onde o leitor precisa de
+   certeza. A distinção é redundante de propósito — cor, glifo cheio/vazado e
+   texto — para sobreviver a tema escuro, impressão e daltonismo. */
+
+.st {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.5;
+  padding: 0.1rem 0.42rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  vertical-align: 0.08em;
+}
+/* Glifo literal, nunca escape CSS de codepoint: build.sh injeta este arquivo
+   como string de substituição de re.subn, e ali contrabarra seguida de dígito
+   vira referência de grupo e o build morre. Vale para o arquivo inteiro. */
+.st::before { content: "●"; font-size: 0.78em; line-height: 1; }
+.st-live { color: var(--ok); }
+.st-planned { color: var(--ink-soft); }
+.st-planned::before { content: "○"; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1.15rem;
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.legend > span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.legend code { background: none; padding: 0; color: var(--accent); }
 
 /* ---- tables ---- */
 
@@ -397,6 +454,18 @@ td code { background: none; padding: 0; color: var(--accent); }
 }
 .map b { color: var(--ink); font-weight: 600; }
 .map i { color: var(--ink-faint); font-style: normal; }
+
+/* Marcador de estado do mapa. width fixa em ch em vez de espaço literal:
+   a largura do glifo ● depende da fonte que atender, e um inline-block com
+   largura declarada mantém a coluna dos comentários alinhada de qualquer jeito. */
+.map u {
+  display: inline-block;
+  width: 2ch;
+  font-size: 0.78em;
+  text-decoration: none;
+}
+.map u.on { color: var(--ok); }
+.map u.off { color: var(--ink-faint); }
 
 .note {
   font-size: 0.84rem;

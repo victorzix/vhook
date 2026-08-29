@@ -284,7 +284,17 @@ h2 {
   color: inherit;
 }
 a.card:hover { border-color: var(--accent); }
-.card-name { font-family: var(--mono); font-size: 0.93rem; font-weight: 600; color: var(--accent); margin: 0; }
+.card-name {
+  font-family: var(--mono);
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
 .card-body { margin: 0; font-size: 0.9rem; color: var(--ink-soft); }
 .card-foot {
   margin: 0;
@@ -338,6 +348,53 @@ a.card:hover { border-color: var(--accent); }
   background: var(--surface);
 }
 .chip b { color: var(--ink); font-weight: 600; }
+
+/* ---- implementation state ----
+
+   Duas categorias, nunca três: ou existe e roda, ou está decidido e não foi
+   construído. "parcial" seria ambíguo justamente onde o leitor precisa de
+   certeza. A distinção é redundante de propósito — cor, glifo cheio/vazado e
+   texto — para sobreviver a tema escuro, impressão e daltonismo. */
+
+.st {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.5;
+  padding: 0.1rem 0.42rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  vertical-align: 0.08em;
+}
+/* Glifo literal, nunca escape CSS de codepoint: build.sh injeta este arquivo
+   como string de substituição de re.subn, e ali contrabarra seguida de dígito
+   vira referência de grupo e o build morre. Vale para o arquivo inteiro. */
+.st::before { content: "●"; font-size: 0.78em; line-height: 1; }
+.st-live { color: var(--ok); }
+.st-planned { color: var(--ink-soft); }
+.st-planned::before { content: "○"; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1.15rem;
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.legend > span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.legend code { background: none; padding: 0; color: var(--accent); }
 
 /* ---- tables ---- */
 
@@ -401,6 +458,18 @@ td code { background: none; padding: 0; color: var(--accent); }
 .map b { color: var(--ink); font-weight: 600; }
 .map i { color: var(--ink-faint); font-style: normal; }
 
+/* Marcador de estado do mapa. width fixa em ch em vez de espaço literal:
+   a largura do glifo ● depende da fonte que atender, e um inline-block com
+   largura declarada mantém a coluna dos comentários alinhada de qualquer jeito. */
+.map u {
+  display: inline-block;
+  width: 2ch;
+  font-size: 0.78em;
+  text-decoration: none;
+}
+.map u.on { color: var(--ok); }
+.map u.off { color: var(--ink-faint); }
+
 .note {
   font-size: 0.84rem;
   color: var(--ink-faint);
@@ -432,7 +501,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
       <a href="#/dados"><i>03</i>Modelo de dados</a>
       <a href="#/invariantes"><i>04</i>Invariantes e escala</a>
     </nav>
-    <p class="side-note">Visão derivada de <code>docs/diagrams/</code> e <code>docs/ARCHITECTURE.md</code>. Quando divergirem, o repositório está certo.</p>
+    <p class="side-note">Visão derivada de <code>docs/diagrams/</code> e <code>docs/ARCHITECTURE.md</code>. Quando divergirem, o repositório está certo.<br><br>Cada seção carrega <b class="st st-live">no ar</b> ou <b class="st st-planned">projetado</b>. O estado spec a spec está em <code>docs/specs/README.md</code>.</p>
   </aside>
 
   <main class="stage">
@@ -444,14 +513,19 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
         <p class="lede">Recebe eventos, enfileira e entrega em endpoints HTTP — com assinatura, timeout curto, retry com backoff e dead letter queue.</p>
         <div class="chips">
           <span class="chip">design <b>fechado</b></span>
-          <span class="chip"><b>30</b> decisões</span>
-          <span class="chip"><b>0</b> linhas de código</span>
+          <span class="chip"><b>33</b> decisões</span>
+          <span class="chip"><b>2</b> specs entregues</span>
           <span class="chip">Go · RabbitMQ · Postgres · Next</span>
         </div>
+        <p class="legend">
+          <span><b class="st st-live">no ar</b> existe no repositório e roda hoje</span>
+          <span><b class="st st-planned">projetado</b> decidido, ainda não construído</span>
+          <span>estado por spec em <code>docs/specs/README.md</code></span>
+        </p>
       </header>
 
       <section>
-        <p class="eyebrow">O problema</p>
+        <p class="eyebrow">O problema<b class="st st-planned">projetado</b></p>
         <h2>A parte fácil é o POST</h2>
         <div class="prose">
           <p>A difícil é que <strong>o destino não é confiável e não é seu</strong>: o servidor do cliente cai, demora 40 segundos, responde 500 por meia hora, ou some.</p>
@@ -474,46 +548,59 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
         <h2>Cada um faz uma coisa — e a linha interessante é o que ele nunca faz</h2>
         <div class="cards">
           <article class="card">
-            <p class="card-name">api</p>
+            <p class="card-name">api<b class="st st-live">no ar</b></p>
             <p class="card-body">Recebe eventos, gerencia endpoints, serve o histórico.</p>
             <p class="card-foot"><b>nunca</b>Faz requisição HTTP de saída.</p>
           </article>
           <article class="card">
-            <p class="card-name">worker</p>
+            <p class="card-name">adminctl<b class="st st-live">no ar</b></p>
+            <p class="card-body">CLI de operação: <code>genkey</code> gera a master key, <code>bootstrap</code> cria a primeira organização e imprime a api key uma vez.</p>
+            <p class="card-foot"><b>nunca</b>Fica no ar — é comando, não processo.</p>
+          </article>
+          <article class="card">
+            <p class="card-name">worker<b class="st st-planned">projetado</b></p>
             <p class="card-body">Consome a fila, dispara o POST assinado, decide retry ou DLQ.</p>
             <p class="card-foot"><b>nunca</b>Recebe requisição.</p>
           </article>
           <article class="card">
-            <p class="card-name">reconciler</p>
+            <p class="card-name">reconciler<b class="st st-planned">projetado</b></p>
             <p class="card-body">Varre entregas presas e republica. Réplica única, sob advisory lock.</p>
             <p class="card-foot"><b>nunca</b>Roda em paralelo consigo mesmo.</p>
           </article>
           <article class="card">
-            <p class="card-name">dashboard</p>
+            <p class="card-name">dashboard<b class="st st-planned">projetado</b></p>
             <p class="card-body">Interface, e BFF que guarda o token administrativo server-side.</p>
             <p class="card-foot"><b>nunca</b>Fala com Rabbit nem Postgres.</p>
           </article>
           <article class="card">
-            <p class="card-name">sink</p>
+            <p class="card-name">sink<b class="st st-planned">projetado</b></p>
             <p class="card-body">Alvo-cobaia da demo: <code>/ok</code>, <code>/500</code>, <code>/timeout</code>, <code>/flaky</code>.</p>
             <p class="card-foot"><b>nunca</b>Vive dentro da api — o worker faz HTTP real.</p>
           </article>
+        </div>
+        <div class="prose">
+          <p>Da lista acima só <code>api</code> e <code>adminctl</code> existem hoje — e a <code>api</code>, por enquanto, sobe aplicando migrations sob advisory lock e serve <code>/healthz</code>, <code>/readyz</code> e <code>/metrics</code>. <strong>Ingress e cadastro de endpoints ainda são spec.</strong></p>
         </div>
       </section>
 
       <section>
         <p class="eyebrow">Repositório</p>
         <h2>Onde cada coisa mora</h2>
-        <pre class="map"><b>cmd/</b>{api,worker,reconciler,sink}       <i>um main por processo</i>
-<b>internal/core/</b>       <i>domínio puro — backoff, classificação de falha</i>
-<b>internal/store/</b>      <i>Postgres via sqlc</i>
-<b>internal/queue/</b>      <i>porta + adapter Rabbit (isola o degrau 4)</i>
-<b>internal/dispatch/</b>   <i>HTTP, HMAC, guard de SSRF, timeout</i>
-<b>internal/errs/</b>       <i>registro de erros: código, nível, status</i>
-<b>contracts/</b>           <i>openapi.yaml + events/*.schema.json — fonte única</i>
-<b>i18n/</b>                <i>errors.pt-BR.json — texto, sem comportamento</i>
-<b>docs/specs/</b>          <i>por domínio, numeração global</i>
-<b>docs/diagrams/</b>       <i>mermaid — fonte desta página</i></pre>
+        <pre class="map"><u class="on">●</u><b>cmd/{api,adminctl}/</b>  <i>um main por processo</i>
+<u class="off">○</u><b>cmd/{worker,reconciler,sink}/</b>
+<u class="off">○</u><b>internal/core/</b>       <i>domínio puro — backoff, classificação de falha</i>
+<u class="on">●</u><b>internal/store/</b>      <i>Postgres via sqlc, pool, advisory locks</i>
+<u class="off">○</u><b>internal/queue/</b>      <i>porta + adapter Rabbit (isola o degrau 4)</i>
+<u class="off">○</u><b>internal/dispatch/</b>   <i>HTTP, HMAC, guard de SSRF, timeout</i>
+<u class="on">●</u><b>internal/ids/</b>        <i>UUIDv7 ↔ prefixo_base32</i>
+<u class="on">●</u><b>internal/apikey/</b>     <i>geração e HMAC com pepper</i>
+<u class="on">●</u><b>internal/errs/</b>       <i>registro de erros: código, nível, status</i>
+<u class="on">●</u><b>internal/obs/</b>        <i>slog, métricas e handlers de health</i>
+<u class="on">●</u><b>internal/openapi/</b>    <i>tipos GERADOS do contrato — nunca editar</i>
+<u class="on">●</u><b>contracts/</b>           <i>openapi.yaml + events/*.schema.json — fonte única</i>
+<u class="on">●</u><b>i18n/</b>                <i>errors.&lt;locale&gt;.json — texto, sem comportamento</i>
+<u class="on">●</u><b>docs/specs/</b>          <i>por domínio, numeração global</i>
+<u class="on">●</u><b>docs/diagrams/</b>       <i>mermaid — fonte desta página</i></pre>
         <div class="prose">
           <p><code>internal/core</code> não importa Postgres, Rabbit nem <code>net/http</code>. É o que mantém a suíte em milissegundos — e o sinal de que a lógica está no pacote errado é um teste pedindo container para exercitar regra de negócio.</p>
         </div>
@@ -525,10 +612,15 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
       <header class="pagehead">
         <h1>Filas e entrega</h1>
         <p class="lede">Como o RabbitMQ agenda o futuro sem saber agendar, e o que acontece com um evento entre o <code>202</code> e o cliente.</p>
+        <p class="legend">
+          <span><b class="st st-live">no ar</b> existe e roda</span>
+          <span><b class="st st-planned">projetado</b> decidido, ainda não construído</span>
+          <span>nada desta página existe em código: o broker sobe no <code>compose</code>, a topologia não.</span>
+        </p>
       </header>
 
       <section>
-        <p class="eyebrow">Topologia</p>
+        <p class="eyebrow">Topologia<b class="st st-planned">projetado</b></p>
         <h2>A mensagem dorme numa fila que ninguém consome</h2>
         <div class="prose">
           <p>AMQP não tem "entregue isso em 5 minutos". A saída é uma fila de espera <strong>sem consumidor</strong>, com <code>x-message-ttl</code> e dead-letter apontando de volta para a exchange principal: o próprio broker devolve a mensagem quando o prazo vence.</p>
@@ -553,7 +645,7 @@ flowchart LR
       </section>
 
       <section>
-        <p class="eyebrow">Backoff</p>
+        <p class="eyebrow">Backoff<b class="st st-planned">projetado</b></p>
         <h2>Dois perfis, escolhidos por application</h2>
         <div class="tbl">
           <table>
@@ -570,7 +662,7 @@ flowchart LR
       </section>
 
       <section>
-        <p class="eyebrow">Fluxo</p>
+        <p class="eyebrow">Fluxo<b class="st st-planned">projetado</b></p>
         <h2>A vida de uma entrega que falha e depois dá certo</h2>
         <div class="sheet">
           <pre class="mermaid">
@@ -616,7 +708,7 @@ sequenceDiagram
       </section>
 
       <section>
-        <p class="eyebrow">Estados</p>
+        <p class="eyebrow">Estados<b class="st st-planned">projetado</b></p>
         <h2>Uma delivery caminha por cinco estados</h2>
         <div class="states">
           <span class="state s-pending">pending <em>na fila</em></span>
@@ -647,7 +739,7 @@ sequenceDiagram
       </section>
 
       <section>
-        <p class="eyebrow">Isolamento</p>
+        <p class="eyebrow">Isolamento<b class="st st-planned">projetado</b></p>
         <h2>Um projeto em carga não atrasa os outros</h2>
         <div class="prose">
           <p>Fila FIFO única não tem noção de justiça: quem publica atrás de um backlog de 50 mil eventos espera pelos 50 mil, por mais workers que existam — o gargalo é a posição, não a capacidade.</p>
@@ -662,10 +754,15 @@ sequenceDiagram
       <header class="pagehead">
         <h1>Modelo de dados</h1>
         <p class="lede">Seis tabelas, três níveis de entrega e duas credenciais guardadas de formas diferentes de propósito.</p>
+        <p class="legend">
+          <span><b class="st st-live">no ar</b> existe e roda</span>
+          <span><b class="st st-planned">projetado</b> decidido, ainda não construído</span>
+          <span>o schema inteiro já é migration aplicada no boot; o que ainda não roda é quem escreve nele.</span>
+        </p>
       </header>
 
       <section>
-        <p class="eyebrow">Estrutura</p>
+        <p class="eyebrow">Estrutura<b class="st st-live">no ar</b></p>
         <h2>Um evento não é uma entrega</h2>
         <div class="prose">
           <p>Um evento publicado gera <strong>uma delivery por endpoint</strong> inscrito, e cada delivery acumula tentativas. Sem essa separação em três níveis é impossível responder a pergunta que o operador tem ao abrir o painel: <em>esse evento chegou em 3 dos 4 endpoints?</em></p>
@@ -708,7 +805,7 @@ erDiagram
         uuid id PK
         uuid application_id FK
         text event_type
-        jsonb payload
+        text payload
         text idempotency_key
         timestamptz received_at
     }
@@ -737,16 +834,44 @@ erDiagram
       </section>
 
       <section>
+        <p class="eyebrow">O tipo que parecia certo<b class="st st-live">no ar</b></p>
+        <h2><code>payload</code> é <code>text</code>, e trocar por <code>jsonb</code> quebraria a assinatura</h2>
+        <div class="prose">
+          <p><code>jsonb</code> não guarda bytes, guarda uma árvore analisada: reordena chaves, descarta duplicatas e re-renderiza na leitura. O que sai do banco não é byte a byte o que entrou.</p>
+          <p>E o HMAC é calculado sobre <code>{timestamp}.{raw_body}</code>. Guardar em <code>jsonb</code> faria a verificação do cliente falhar de forma <strong>intermitente</strong> — só quando a ordem das chaves mudasse — e dentro do banco, onde é ainda mais difícil de enxergar do que no código.</p>
+          <p>É o único ponto do schema onde um invariante podia morrer em silêncio escolhendo o tipo de aparência mais correta. A coluna é <code>nullable</code> porque <code>NULL</code> significa expurgado pela retenção de 30 dias.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Identificadores<b class="st st-live">no ar</b></p>
+        <h2>UUIDv7 no banco, prefixo e base32 na borda</h2>
+        <div class="tbl">
+          <pre>
+banco    018f4c2a-7b31-7c4e-9a2b-1f5c8d3e6b04
+API      evt_01HX62MYSHFH79MARZBJ6KWTR4
+
+org_  app_  ept_  evt_  dlv_  att_
+          </pre>
+        </div>
+        <div class="prose">
+          <p>A escolha real não é entre bibliotecas de ID, é entre <strong>ordenável por tempo</strong> e <strong>aleatório</strong>. <code>delivery_attempts</code> é a tabela de maior taxa de inserção do sistema; com chave aleatória cada insert cai num ponto arbitrário do índice B-tree, causando divisão de página, inchaço de índice e WAL maior. UUIDv7 acumula à direita da árvore.</p>
+          <p>O prefixo existe para uma classe de bug específica: um <code>delivery_id</code> colado onde se espera um <code>endpoint_id</code> deixa de ser um 404 confuso e passa a ser erro de validação nomeado.</p>
+          <p>O custo é que o <code>psql</code> mostra o UUID cru. A mitigação é uma função SQL: <code>WHERE id = vhook_id('evt_01HX62…')</code>, com um teste de integração rodando os <strong>mesmos vetores fixos</strong> contra a implementação Go e a SQL — sem ele, ter o encoding escrito duas vezes seria fonte garantida de divergência.</p>
+        </div>
+      </section>
+
+      <section>
         <p class="eyebrow">Credenciais</p>
         <h2>Uma hasheada, a outra cifrada — e não é inconsistência</h2>
         <div class="cards">
           <article class="card">
-            <p class="card-name">applications.api_key_hash</p>
+            <p class="card-name">applications.api_key_hash<b class="st st-live">no ar</b></p>
             <p class="card-body">O cliente a usa para publicar eventos <strong>dentro</strong> do vhook.</p>
-            <p class="card-foot"><b>hasheada</b>Só é preciso verificar se bate. O valor original nunca é necessário de novo.</p>
+            <p class="card-foot"><b>hmac-sha256 com pepper</b>Só é preciso verificar se bate. O valor original nunca é necessário de novo.</p>
           </article>
           <article class="card">
-            <p class="card-name">endpoints.secret</p>
+            <p class="card-name">endpoints.secret<b class="st st-planned">projetado</b></p>
             <p class="card-body">O vhook usa para assinar o que <strong>sai</strong>; o sistema do cliente usa para verificar.</p>
             <p class="card-foot"><b>cifrada com aes-gcm</b>O valor em claro é necessário para calcular o HMAC. Hasheá-la impossibilitaria assinar.</p>
           </article>
@@ -757,7 +882,27 @@ erDiagram
       </section>
 
       <section>
-        <p class="eyebrow">Assinatura</p>
+        <p class="eyebrow">Api key<b class="st st-live">no ar</b></p>
+        <h2>Hash rápido com pepper — nunca salt, nunca bcrypt</h2>
+        <div class="tbl">
+          <pre>
+vhk_zDccFjpqVDQHpyWI9SskzezueMASw60LLuaLOFjmD8H
+
+43 caracteres, porque 43 × log₂(62) = 256,0 bits
+guardado como HMAC-SHA256(VHOOK_MASTER_KEY, chave)
+          </pre>
+        </div>
+        <div class="prose">
+          <p><strong>Por que não bcrypt ou argon2.</strong> Duas coisas quebram. O índice deixa de existir: os dois salgam, então o mesmo segredo produz hashes diferentes, e <code>WHERE api_key_hash = $1</code> se torna impossível — a única forma de achar a linha seria carregar <strong>todas</strong> as applications e comparar uma a uma, a cada requisição. E o custo sai de ruído para dominante: ~0,4 µs contra 50–100 ms. A 100 req/s, bcrypt consumiria de 5 a 10 núcleos só hasheando.</p>
+          <p>Hash lento é <strong>errado</strong> aqui, não só caro. Bcrypt e argon2 existem para proteger senha humana de baixa entropia contra ataque de dicionário — o custo por tentativa é a defesa. Uma chave de 256 bits de <code>crypto/rand</code> não tem espaço de busca explorável.</p>
+          <p><strong>Por que pepper e não salt.</strong> Salt defende contra rainbow table sobre segredo de baixa entropia — ataque que aqui não existe — e custaria o determinismo, que é o que sustenta o índice. E salt <strong>não</strong> protege contra escrita no banco: quem consegue alterar <code>api_key_hash</code> escolhe uma chave, calcula o hash e grava, gerando o salt também. O pepper, que vive no ambiente e nunca no banco, faz um dump <em>lido</em> ser inútil sozinho.</p>
+          <p>O ganho maior é o argumento encurtar: com pepper a afirmação é "um dump de banco sozinho é inútil para autenticação", ponto. Sem ele seria "é seguro porque 2²⁵⁶ não se enumera e porque quem tem a chave não precisa do hash" — verdadeiro, mas raciocínio que alguém tem de reconstruir corretamente em cada review.</p>
+          <p><strong>O custo, e o eixo real não é desempenho contra segurança.</strong> É acoplamento operacional: rotacionar o pepper invalida todas as api keys, porque recalcular o HMAC exige o valor em claro, que não guardamos.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Assinatura<b class="st st-planned">projetado</b></p>
         <h2>O timestamp entra dentro do que é assinado</h2>
         <div class="tbl">
           <table>
@@ -777,7 +922,7 @@ erDiagram
       </section>
 
       <section>
-        <p class="eyebrow">Retenção</p>
+        <p class="eyebrow">Retenção<b class="st st-planned">projetado</b></p>
         <h2>O payload sai, os metadados ficam</h2>
         <div class="tbl">
           <table>
@@ -800,10 +945,15 @@ erDiagram
       <header class="pagehead">
         <h1>Invariantes e escala</h1>
         <p class="lede">O que quebra sem lançar erro, e quais degraus existem quando a métrica pedir.</p>
+        <p class="legend">
+          <span><b class="st st-live">no ar</b> existe e roda</span>
+          <span><b class="st st-planned">projetado</b> decidido, ainda não construído</span>
+          <span>invariante aqui é regra a cumprir quando o código chegar, não teste que já roda.</span>
+        </p>
       </header>
 
       <section>
-        <p class="eyebrow">Invariantes</p>
+        <p class="eyebrow">Invariantes<b class="st st-planned">projetado</b></p>
         <h2>Nenhuma destas produz erro de compilação</h2>
         <div class="prose">
           <p>Todas produzem um sistema que <strong>parece funcionar</strong>. É por isso que cada uma está escrita com o modo de falha ao lado — sem ele, alguém "conserta" o que parece inconsistência.</p>
@@ -853,7 +1003,7 @@ erDiagram
       </section>
 
       <section>
-        <p class="eyebrow">Escala</p>
+        <p class="eyebrow">Escala<b class="st st-planned">projetado</b></p>
         <h2>Onde estamos, e os quatro degraus</h2>
         <div class="prose">
           <p>O design de hoje sustenta na ordem de <strong>centenas de entregas por segundo</strong> num VPS modesto — cerca de 65 milhões por dia. Cada degrau só é subido quando a métrica pedir.</p>
@@ -882,7 +1032,7 @@ erDiagram
           <p>Cargas do tipo "5.000 projetos a 50.000 eventos/s cada" — 250 milhões por segundo — exigiriam centenas de máquinas só para sustentar socket. E o limite real seria do outro lado: <strong>50.000 requisições por segundo sustentadas contra o servidor de um cliente.</strong> Quem absorve isso não usa webhook, usa streaming.</p>
           <p>Pré-construir para esse número sem dado de uso seria dimensionar no escuro.</p>
         </div>
-        <p class="note">Fonte: <code>docs/ARCHITECTURE.md</code> e <code>CLAUDE.md</code> — quando divergirem, o repositório está certo e esta página está velha.</p>
+        <p class="note">Fonte: <code>docs/ARCHITECTURE.md</code> e <code>CLAUDE.md</code> — quando divergirem, o repositório está certo e esta página está velha. Os selos <b class="st st-live">no ar</b> e <b class="st st-planned">projetado</b> seguem o índice de <code>docs/specs/README.md</code>, que é onde o estado é mantido spec a spec.</p>
       </section>
     </div>
 
