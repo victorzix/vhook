@@ -657,6 +657,36 @@ Com o escopo no caminho, esse dia não toca a API Go: o BFF passa hoje o valor �
 
 **Descartado.** Escopo implícito vindo de configuração: é o que §4.14 sugeria, e só funciona enquanto houver um tenant. Header `X-Vhook-Application-Id`: explícito, mas esquecível, e header é lugar estranho para escopo de recurso. Parâmetro de query: funciona no `GET`, fica torto no `POST`, e mantém o "esquecer é possível".
 
+### 4.35 Next.js no front, com a superfície de CVE examinada
+
+**Decisão.** O dashboard e a página comercial são Next.js (App Router). A escolha foi reexaminada contra Angular e Vue antes da primeira linha de front, e mantida — mas com três regras que a análise de ameaça impõe.
+
+**O critério estrutural é o BFF.** §4.22 exige uma camada server-side que segure o `VHOOK_ADMIN_TOKEN` e, quando o login existir, resolva o usuário para os `application_id` permitidos. No Next essa camada **é o framework**: route handler roda no servidor, mesmo projeto, mesmo deploy. Em Angular seriam duas saídas — subir `@angular/ssr` com um Express próprio e acrescentar rotas nele, ou criar um serviço separado só para ser o BFF. As duas funcionam; nas duas **a camada é montada à mão**.
+
+Somam-se dois pontos menores mas reais: `shadcn/ui` é React, e `apps/CLAUDE.md` o adota como base de todo componente; e `packages/ui` só existe se dashboard e comercial forem o mesmo framework.
+
+**Vue não perde nesse critério, e isso vale registrar.** Nuxt tem `server/api/`, `shadcn-vue` sobre reka-ui, `@tanstack/vue-query`, Pinia e `@nuxtjs/i18n` — substituto um-para-um para cada peça que `apps/CLAUDE.md` nomeia. Contra Nuxt o Next ganha por **tamanho de ecossistema**, não por estrutura. Contra Angular ganha por estrutura.
+
+O que decidiu, no fim, foi produtividade: o dono do repositório é mais rápido em Next, e o dashboard não é a parte difícil deste sistema — a entrega é. Front que trava atrasa a demonstração do que importa.
+
+#### A preocupação com CVEs, e por que ela vira regra em vez de troca
+
+Next tem superfície grande porque faz muita coisa no servidor: otimização de imagem, cache, ISR, middleware, server actions. Mais superfície, mais CVE — e o histórico existe. O caso mais citado é o **CVE-2025-29927**: bypass de autorização no middleware via header `x-middleware-subrequest`, CVSS 9.1.
+
+**Ele foi grave porque muita gente usava o middleware do Next como camada de autorização.** Este projeto não usa, e não pode passar a usar. O que protege as rotas aqui é o `AdminToken` verificado pela API Go — que o browser nunca vê, e que um bypass no middleware do Next não alcança.
+
+**Trocar de framework por causa disso se vira contra o objetivo.** §4.22 exige o BFF de qualquer forma; sair do Next não elimina o servidor, apenas transfere o BFF de um framework auditado publicamente para um Express escrito por nós. Contagem alta de CVE também significa **muita gente olhando** — e o Express caseiro não tem ninguém. Para uma camada que segura credencial administrativa, código com histórico público vale mais que código sem histórico nenhum.
+
+**As três regras que isso impõe:**
+
+1. **Autorização nunca no middleware do Next.** Só em route handler, e a verificação que vale é a da API Go. É onde a classe inteira desses bugs mora.
+2. **Atualização de dependência automatizada** — Renovate ou Dependabot no repositório, com o Next fixado. A mitigação real de CVE é ter caminho de atualização vivo, não ter menos CVE.
+3. **`output: standalone` no Docker**, sem depender de nada da Vercel. §3 fixa deploy em VPS própria com Coolify.
+
+**Tradeoff.** Ficamos com a superfície de servidor do Next e com a obrigação de acompanhar advisories. Em troca, o BFF é código de framework em vez de código nosso, e o front nasce na ferramenta em que se produz mais rápido.
+
+**Descartado.** Angular: pelos três custos acima — BFF montado à mão, shadcn fora, comercial em terreno desconfortável para SEO. Vue com Nuxt: não perde em estrutura e tem substituto para tudo; perde em ecossistema, e a diferença não compensou a curva a partir de zero de conhecimento. Servir o dashboard pela própria API Go, eliminando o BFF: colocaria a autorização em Go e reabriria §4.22, que separou as duas justamente para a troca de "org fixa" por "org da sessão" ficar confinada a uma camada.
+
 ---
 
 ## 5. Escada de escala

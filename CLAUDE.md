@@ -4,11 +4,13 @@ Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadast
 
 **Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md), [002](docs/specs/platform/002-tenancy-bootstrap/spec.md) e [003](docs/specs/endpoints/003-endpoint-registration/spec.md) implementadas.** A `api` sobe com migrations no boot, `/healthz`, `/readyz` e `/metrics` respondem, o `adminctl` cria a primeira organização e application com api key utilizável, e as rotas de cadastro de endpoint estão de pé — com secret cifrado, validação de SSRF e autenticação de management vinda do contrato.
 
-Próxima spec: **`ingress` — recebimento de evento**, que agora tem tudo de que precisa: application para autenticar e endpoint para o qual gerar `deliveries`. Ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
+Em revisão: **[spec 004](docs/specs/dashboard/004-dashboard-skeleton/spec.md) — esqueleto do dashboard**, com a tela de Endpoints contra BFF mockado. Sem conexão com a API ainda: os fixtures são tipados pelo contrato, e conectar vira spec própria.
+
+Depois dela: **`ingress` — recebimento de evento**, que já tem tudo de que precisa — application para autenticar e endpoint para o qual gerar `deliveries`.
 
 Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html` como Artifact — o HTML já está atualizado, falta publicar · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
 
-**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 34 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
+**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 35 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
 
 ## Stack fechada
 
