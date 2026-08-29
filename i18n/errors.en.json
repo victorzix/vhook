@@ -1,9 +1,18 @@
 {
   "APP-CFL-001": "Bootstrap has already run on this installation.",
+  "APP-NFD-001": "Application not found.",
   "APP-VAL-001": "Invalid value for one of the arguments.",
+  "AUT-CRD-001": "Missing or invalid credential.",
   "CFG-VAL-001": "Required configuration is missing.",
+  "EPT-CFL-001": "An endpoint with this URL already exists in this application.",
+  "EPT-NFD-001": "Endpoint not found.",
+  "EPT-VAL-001": "Invalid URL. The address must use https.",
+  "EPT-VAL-002": "The URL points to a network address that is not allowed.",
+  "EPT-VAL-003": "Could not resolve the URL's domain.",
   "QUE-DEP-001": "Message queue unavailable.",
+  "RTL-LMT-001": "Plan endpoint limit reached.",
   "STO-DEP-001": "Database unavailable.",
   "SYS-DEP-001": "Service is shutting down. Try again.",
-  "SYS-INT-001": "Unexpected internal failure."
+  "SYS-INT-001": "Unexpected internal failure.",
+  "SYS-VAL-001": "Malformed identifier."
 }

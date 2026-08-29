@@ -99,4 +99,28 @@ var (
 
 	// InvalidArgument: a CLI flag carries a value outside the allowed set.
 	InvalidArgument = register("APP-VAL-001", TypeVAL)
+
+	// InvalidCredentials never distinguishes a missing token from a wrong one:
+	// telling them apart would confirm to an attacker that the envelope is right.
+	InvalidCredentials = register("AUT-CRD-001", TypeCRD)
+
+	// MalformedID is the code spec 001 deferred, saying it would be minted by
+	// the first route that takes an identifier in the path. This is that route.
+	MalformedID = register("SYS-VAL-001", TypeVAL)
+
+	ApplicationNotFound = register("APP-NFD-001", TypeNFD)
+
+	InvalidEndpointURL = register("EPT-VAL-001", TypeVAL)
+	ForbiddenAddress   = register("EPT-VAL-002", TypeVAL)
+	UnresolvableHost   = register("EPT-VAL-003", TypeVAL)
+
+	// EndpointNotFound also answers "exists, but belongs to another tenant":
+	// a 403 there would confirm the resource exists.
+	EndpointNotFound = register("EPT-NFD-001", TypeNFD)
+
+	DuplicateEndpoint = register("EPT-CFL-001", TypeCFL)
+
+	// EndpointLimit overrides LMT's 429: 429 promises that retrying later
+	// works, and a capacity quota does not free up with time.
+	EndpointLimit = register("RTL-LMT-001", TypeLMT, withStatus(http.StatusForbidden))
 )

@@ -1,9 +1,18 @@
 {
   "APP-CFL-001": "O bootstrap já foi executado nesta instalação.",
+  "APP-NFD-001": "Application não encontrada.",
   "APP-VAL-001": "Valor inválido para um dos argumentos.",
+  "AUT-CRD-001": "Credencial ausente ou inválida.",
   "CFG-VAL-001": "Configuração obrigatória ausente.",
+  "EPT-CFL-001": "Já existe um endpoint com essa URL nesta application.",
+  "EPT-NFD-001": "Endpoint não encontrado.",
+  "EPT-VAL-001": "URL inválida. O endereço precisa usar https.",
+  "EPT-VAL-002": "A URL aponta para um endereço de rede não permitido.",
+  "EPT-VAL-003": "Não foi possível resolver o domínio da URL.",
   "QUE-DEP-001": "Fila de mensagens indisponível.",
+  "RTL-LMT-001": "Limite de endpoints do plano atingido.",
   "STO-DEP-001": "Banco de dados indisponível.",
   "SYS-DEP-001": "Serviço em desligamento. Tente novamente.",
-  "SYS-INT-001": "Falha interna inesperada."
+  "SYS-INT-001": "Falha interna inesperada.",
+  "SYS-VAL-001": "Identificador malformado."
 }

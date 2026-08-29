@@ -1,9 +1,18 @@
 {
   "APP-CFL-001": "Le bootstrap a déjà été exécuté sur cette installation.",
+  "APP-NFD-001": "Application introuvable.",
   "APP-VAL-001": "Valeur invalide pour l'un des arguments.",
+  "AUT-CRD-001": "Identifiant absent ou invalide.",
   "CFG-VAL-001": "Configuration obligatoire manquante.",
+  "EPT-CFL-001": "Un endpoint avec cette URL existe déjà dans cette application.",
+  "EPT-NFD-001": "Endpoint introuvable.",
+  "EPT-VAL-001": "URL invalide. L'adresse doit utiliser https.",
+  "EPT-VAL-002": "L'URL pointe vers une adresse réseau non autorisée.",
+  "EPT-VAL-003": "Impossible de résoudre le domaine de l'URL.",
   "QUE-DEP-001": "File de messages indisponible.",
+  "RTL-LMT-001": "Limite d'endpoints du forfait atteinte.",
   "STO-DEP-001": "Base de données indisponible.",
   "SYS-DEP-001": "Service en cours d'arrêt. Réessayez.",
-  "SYS-INT-001": "Échec interne inattendu."
+  "SYS-INT-001": "Échec interne inattendu.",
+  "SYS-VAL-001": "Identifiant mal formé."
 }

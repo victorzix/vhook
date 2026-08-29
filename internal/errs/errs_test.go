@@ -38,8 +38,8 @@ func TestEveryErrorHasALevel(t *testing.T) {
 }
 
 func TestDeclaredOverrides(t *testing.T) {
-	// As sobrescritas da spec 001. Se alguma mudar sem passar pela spec,
-	// este teste é onde isso aparece.
+	// As sobrescritas declaradas nas specs. Se alguma mudar sem passar pela
+	// spec, este teste é onde isso aparece.
 	tests := []struct {
 		err    *errs.Error
 		level  errs.Level
@@ -50,6 +50,7 @@ func TestDeclaredOverrides(t *testing.T) {
 		{errs.Draining, errs.LevelWarn, http.StatusServiceUnavailable},
 		{errs.Internal, errs.LevelError, http.StatusInternalServerError},
 		{errs.MissingConfig, errs.LevelError, 0},
+		{errs.EndpointLimit, errs.LevelWarn, http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.err.Code, func(t *testing.T) {
