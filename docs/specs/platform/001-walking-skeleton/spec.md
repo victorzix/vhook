@@ -22,7 +22,7 @@ Não existe código. Nenhuma spec de feature pode começar sem schema, geração
 | `docker-compose.yml` | serviços `postgres`, `rabbitmq` e `api` |
 | `Dockerfile` | multi-stage, binário estático, imagem final `gcr.io/distroless/static` |
 | `Makefile` | `up` `down` `run` `generate` `test` `test-integration` |
-| `migrations/` | as 7 tabelas de [§4.5](../../../ARCHITECTURE.md), via `golang-migrate`, aplicadas no boot da `api` sob advisory lock |
+| `migrations/` | as 6 tabelas de [§4.5](../../../ARCHITECTURE.md), via `golang-migrate`, aplicadas no boot da `api` sob advisory lock |
 | `internal/store` | pool `pgxpool`, runner de migration e `sqlc.yaml` com a query de health |
 | `internal/openapi` | tipos **gerados** de `openapi.yaml`; nunca editados à mão |
 | `internal/errs` | os tipos de [`ERRORS.md`](../../../ERRORS.md) com nível e status, e as 4 primeiras constantes |
@@ -98,7 +98,7 @@ O valor do cliente **nunca** é reutilizado como o nosso. Se fosse, o identifica
 
 ## Modelo de dados
 
-Migration única criando as 7 tabelas de [§4.5](../../../ARCHITECTURE.md). O modelo já está fechado, então escrever de uma vez evita uma sequência de `ALTER TABLE` sobre tabelas recém-criadas — e evita que a spec de ingress precise criar `deliveries` com `CREATE INDEX CONCURRENTLY` sobre tabela em uso.
+Migration única criando as 6 tabelas de [§4.5](../../../ARCHITECTURE.md). O modelo já está fechado, então escrever de uma vez evita uma sequência de `ALTER TABLE` sobre tabelas recém-criadas — e evita que a spec de ingress precise criar `deliveries` com `CREATE INDEX CONCURRENTLY` sobre tabela em uso.
 
 ### Chave primária
 
@@ -292,7 +292,7 @@ Não toca: ordem de ack, DLQ por publicação explícita, mensagem magra, consta
 
 ### Integração — testcontainers
 
-- Migrations aplicadas do zero produzem o schema esperado: as 7 tabelas, e cada índice e constraint nomeado acima.
+- Migrations aplicadas do zero produzem o schema esperado: as 6 tabelas, e cada índice e constraint nomeado acima.
 - `up` seguido de `down` volta ao banco vazio — prova que os arquivos `down` não são ficção.
 - Duas goroutines chamando o runner de migration ao mesmo tempo: uma aplica, nenhuma retorna erro.
 - `vhook_id` decodifica os **mesmos vetores** de `testdata/vectors.json` que o teste Go usa, com e sem prefixo, em minúsculas e com caracteres ambíguos; entrada inválida levanta `22P02`. É este teste que impede as duas implementações do encoding de divergirem.

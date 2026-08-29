@@ -49,7 +49,7 @@ Herdadas por toda task. Não repetir dentro delas.
 | `Makefile` | `up` `down` `run` `generate` `test` `test-integration` |
 | `.env.example` | as três variáveis de ambiente |
 | `migrations/migrations.go` | `embed.FS` dos `.sql` — precisa ser pacote para o `go:embed` alcançar |
-| `migrations/000001_initial_schema.{up,down}.sql` | as 7 tabelas e seus índices |
+| `migrations/000001_initial_schema.{up,down}.sql` | as 6 tabelas e seus índices |
 | `migrations/000002_vhook_id_function.{up,down}.sql` | `vhook_id(text) → uuid` |
 | `i18n/i18n.go` | `embed.FS` dos catálogos e a lista canônica de locales |
 | `i18n/errors.{pt-BR,en,es,fr}.json` | código → mensagem, sem comportamento |
