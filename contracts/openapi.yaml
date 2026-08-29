@@ -74,6 +74,133 @@ paths:
               schema:
                 type: string
 
+  # O tenant vai no caminho, nunca implícito nem em header — ver §4.34.
+  # Com escopo no caminho, esquecê-lo é impossível: a URL não se constrói sem
+  # ele. E a query do detalhe vira `WHERE id = $1 AND application_id = $2`,
+  # então recurso de outro tenant devolve 404 sem confirmar que existe.
+  /v1/applications/{application_id}/endpoints:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationId'
+    get:
+      operationId: listEndpoints
+      summary: Lista os endpoints de uma application
+      description: |
+        Não devolve o `secret`. Revelá-lo é permitido quantas vezes se quiser
+        (§4.28), mas a listagem é a resposta que mais aparece em tela, em cache
+        de front e em log de proxy — o detalhe é o lugar de revelar.
+
+        Sem paginação: o plano free permite 2 endpoints por application.
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: Os endpoints da application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      operationId: createEndpoint
+      summary: Cadastra um endpoint
+      description: |
+        Gera o secret, valida a URL contra faixas privadas e link-local, e
+        devolve o secret em claro — a única resposta que o traz junto da criação.
+
+        A validação de SSRF aqui é conveniência e defesa em profundidade, **não**
+        a garantia: o DNS pode mudar depois do cadastro. A checagem que sustenta
+        a garantia é no disparo, sobre o IP que a conexão vai usar.
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEndpointRequest'
+      responses:
+        '201':
+          description: Endpoint criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointWithSecret'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/applications/{application_id}/endpoints/{endpoint_id}:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationId'
+      - $ref: '#/components/parameters/EndpointId'
+    get:
+      operationId: getEndpoint
+      summary: Detalha um endpoint, com o secret
+      description: |
+        Traz o `secret`. §4.28 permite revelá-lo quantas vezes se quiser: sem
+        rotação, perdê-lo obrigaria a recriar o endpoint e reconfigurar o
+        cliente. Muda para revelar-uma-vez quando a rotação existir.
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: O endpoint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointWithSecret'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    patch:
+      operationId: updateEndpoint
+      summary: Altera a URL de um endpoint
+      description: |
+        Só a `url` é mutável, e a mudança revalida SSRF. Existe para que
+        corrigir um erro de digitação não exija recriar o endpoint — o que
+        geraria secret novo e obrigaria o cliente a se reconfigurar.
+
+        `status` não é mutável aqui: ativar e desativar é ciclo de vida, e
+        pertence à spec do circuit breaker junto com a desativação automática.
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEndpointRequest'
+      responses:
+        '200':
+          description: Endpoint alterado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Endpoint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
 components:
   securitySchemes:
     ApplicationApiKey:
@@ -89,6 +216,24 @@ components:
         server-side pelo BFF do dashboard — nunca chega ao browser.
 
   parameters:
+    ApplicationId:
+      name: application_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ApplicationId'
+      description: |
+        A application dona do recurso. Hoje o BFF passa o valor único vindo do
+        bootstrap; quando houver login, passa o da sessão do usuário. A API não
+        vê diferença — é o que torna login plugável sem reescrever rota (§4.34).
+
+    EndpointId:
+      name: endpoint_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EndpointId'
+
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -110,6 +255,113 @@ components:
         Paginação keyset sobre `(created_at, id)`. Opaco para o cliente.
 
   schemas:
+    # Identificadores: UUIDv7 no banco, prefixo + base32 na borda (§4.31).
+    # O prefixo faz um id de outro recurso virar erro de validação nomeado,
+    # em vez de um 404 sem explicação.
+    ApplicationId:
+      type: string
+      pattern: '^app_[0-9A-HJKMNP-TV-Z]{26}$'
+      examples:
+        - app_01J4PMX3R0E008000000000002
+
+    EndpointId:
+      type: string
+      pattern: '^ept_[0-9A-HJKMNP-TV-Z]{26}$'
+      examples:
+        - ept_01J4PMX3R0E008000000000003
+
+    EndpointStatus:
+      type: string
+      enum: [active, disabled]
+      description: |
+        `disabled` só é alcançável pelo circuit breaker, que ainda não existe.
+        Nenhuma rota desta versão escreve neste campo.
+
+    Endpoint:
+      type: object
+      required: [id, url, status, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EndpointId'
+        url:
+          type: string
+          format: uri
+          examples:
+            - https://api.cliente.com/hooks
+        status:
+          $ref: '#/components/schemas/EndpointStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    # Campos repetidos em vez de `allOf` com Endpoint: composição gera nome de
+    # tipo imprevisível, e este contrato prefere geração determinística a
+    # contrato DRY — o mesmo motivo que promoveu ReadyChecks a schema nomeado.
+    EndpointWithSecret:
+      type: object
+      required: [id, url, status, created_at, secret]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EndpointId'
+        url:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/EndpointStatus'
+        created_at:
+          type: string
+          format: date-time
+        secret:
+          type: string
+          pattern: '^whsec_[0-9A-Za-z]{43}$'
+          description: |
+            Chave do HMAC que o cliente usa para verificar a assinatura.
+            Guardada cifrada com AES-GCM: o vhook precisa do valor em claro
+            para assinar, então hasheá-la impossibilitaria a entrega (§4.12).
+          examples:
+            - whsec_zDccFjpqVDQHpyWI9SskzezueMASw60LLuaLOFjmD8H
+
+    EndpointList:
+      type: object
+      required: [endpoints]
+      additionalProperties: false
+      properties:
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Endpoint'
+
+    CreateEndpointRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: |
+            Obrigatoriamente `https`. O destino é validado contra faixas
+            privadas, loopback, link-local, CGNAT e os equivalentes IPv6,
+            inclusive IPv4 mapeado.
+
+            `http` fica de fora por ora: afrouxar depois não quebra nada,
+            apertar depois quebraria todo endpoint já cadastrado.
+          examples:
+            - https://api.cliente.com/hooks
+
+    UpdateEndpointRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          maxLength: 2048
+
     Health:
       type: object
       required: [status]
@@ -213,6 +465,39 @@ components:
 
     UnprocessableEntity:
       description: Conteúdo bem-formado, mas inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: |
+        Autenticado, mas sem direito ao que foi pedido — quota de plano
+        esgotada, por exemplo.
+
+        403 e não o 429 padrão do tipo `LMT`: 429 promete que tentar de novo
+        mais tarde resolve, e uma quota de capacidade não se libera com o tempo.
+        O cliente ficaria em retry eterno contra uma parede.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: |
+        Recurso inexistente — ou existente e pertencente a outro tenant. As
+        duas situações são indistinguíveis de fora **de propósito**: um 403
+        confirmaria a existência do recurso.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: |
+        Conflito com o estado atual: já existe endpoint com essa URL nesta
+        application. Dois endpoints com a mesma URL receberiam entregas
+        idênticas em duplicata.
       content:
         application/json:
           schema:

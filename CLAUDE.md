@@ -2,13 +2,13 @@
 
 Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadastrados, com assinatura HMAC, timeout agressivo, retry com backoff exponencial e DLQ.
 
-**Estado: [spec 001](docs/specs/platform/001-walking-skeleton/spec.md) implementada — o esqueleto anda.** A `api` sobe com migrations no boot, o schema completo existe, os contratos geram tipos, o registro de erros e os catálogos de locale estão de pé, e `/healthz`, `/readyz` e `/metrics` respondem.
+**Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md) e [002](docs/specs/platform/002-tenancy-bootstrap/spec.md) implementadas.** A `api` sobe com migrations no boot, o schema existe, os contratos geram tipos, o registro de erros e os catálogos de locale estão de pé, `/healthz`, `/readyz` e `/metrics` respondem, e o `adminctl` cria a primeira organização e application com api key utilizável.
 
-Próxima spec: **`endpoints` — cadastro**, que é pré-requisito de ingress porque uma `delivery` só existe se houver endpoint (§4.5). Ela começa pela entrevista (ver Workflow abaixo), não por escrever arquivo.
+Em revisão: **[spec 003](docs/specs/endpoints/003-endpoint-registration/spec.md) — cadastro de endpoints**, que traz junto a primeira autenticação de management. É pré-requisito de ingress, porque uma `delivery` só existe se houver endpoint (§4.5).
 
-Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html`, que está atrasado em relação a §4.31 e §4.32 · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
+Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html` como Artifact — o HTML já está atualizado, falta publicar · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
 
-**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 32 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
+**Antes de propor qualquer coisa arquitetural, leia [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** São 34 decisões, cada uma com o tradeoff aceito e as alternativas já descartadas. Se uma sugestão sua aparece lá como descartada, o motivo está escrito — traga um argumento novo ou siga a decisão.
 
 ## Stack fechada
 
@@ -167,6 +167,8 @@ Secrets usados pelo release, ambos opcionais: `VHOOK_INGRESS_URL` e `VHOOK_INGRE
 | `make up` | sobe Postgres e RabbitMQ; a `api` roda local |
 | `make down` | derruba a infraestrutura |
 | `make run` | sobe a `api`, aplicando migrations no boot |
+| `go run ./cmd/adminctl genkey` | gera uma `VHOOK_MASTER_KEY` |
+| `go run ./cmd/adminctl bootstrap` | cria a primeira organização e application, e imprime a api key uma única vez |
 | `make generate` | regenera sqlc e oapi-codegen; o CI falha se o commitado estiver atrasado |
 | `make test` | só unidade, com `-short` |
 | `make test-integration` | tudo, subindo container de verdade |

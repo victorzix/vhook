@@ -45,6 +45,8 @@ Domínio novo se cria quando aparece a segunda spec que não cabe em nenhum exis
 | # | Domínio | Spec | Release | Status |
 |---|---|---|---|---|
 | 001 | `platform` | [Walking skeleton](platform/001-walking-skeleton/spec.md) | `v0.1.0` | implementada |
+| 002 | `platform` | [Bootstrap de tenancy](platform/002-tenancy-bootstrap/spec.md) | `v0.2.0` | implementada |
+| 003 | `endpoints` | [Cadastro de endpoints](endpoints/003-endpoint-registration/spec.md) | `v0.3.0` | aprovada |
 
 Uma spec só está aprovada quando entra nesta tabela. É a única visão que mostra ordem, release e status juntos — as pastas mostram agrupamento, não progresso.
 

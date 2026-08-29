@@ -278,6 +278,23 @@ O changelog começa no primeiro commit, não quando o produto ficar utilizável:
 
 O dogfooding é o ponto: qualquer bug de entrega passa a doer em quem escreveu o dispatcher, e o caminho de entrega passa a ser exercitado a cada release em vez de só em teste. Enquanto a URL de destino não existir o passo é no-op, e um script de backfill publica um evento por tag histórica quando ela existir — seguro por idempotência (§4.13).
 
+**O formato do payload já está decidido, e não é gerado do histórico de commits.** O texto de cada release mora versionado no repositório, em `content/releases/<versão>.json`, e é revisado como qualquer outra mudança:
+
+```
+{ "releasedAt": "2026-08-14T17:30:00Z",
+  "title":  { "pt-BR": "…", "en": "…", "es": "…", "fr": "…" },
+  "notes":  { "pt-BR": "…", "en": "…", "es": "…", "fr": "…" },
+  "changes": [ { "type": "added", "text": { "pt-BR": "…", … } } ] }
+```
+
+**Por quê.** Changelog gerado de commit serve para quem lê o repositório; quem consome o webhook de release quer a frase que explica a mudança, no idioma dele. Os quatro locales são os mesmos de §4.29, pelo mesmo motivo — quem traduz é quem é dono da interface, e aqui a interface é nossa.
+
+O formato é emprestado de um projeto irmão que já o usa em produção, então nasce validado em vez de inventado. A publicação é **idempotente por versão**, o que faz republicar depois de corrigir um texto **corrigir** em vez de duplicar — e é o que torna seguro rodar o passo a cada deploy.
+
+**Tradeoff.** Escrever o texto da release à mão é trabalho que o gerador automático não cobra. Em troca, o anúncio deixa de ser uma lista de assuntos de commit em inglês técnico.
+
+A ferramenta de corte de versão continua sendo o release-please, **não** o `commit-and-tag-version` do projeto irmão: o segundo é npm, e trazer Node para um repositório Go só para cortar tag não se paga. O que se empresta é o formato do payload e a semântica idempotente, não o tooling.
+
 **Tradeoff.** Dependência circular: se o vhook estiver fora do ar durante uma release, o anúncio não sai. Falha benigna e reenviável pela DLQ, mas é uma dependência real assumida em troca de exercitar o próprio caminho de entrega continuamente.
 
 ### 4.17 O `sink` é um serviço separado
@@ -344,10 +361,10 @@ Nesse último caso a fila é integralmente reconstruível a partir do banco, o q
 POST /v1/events            Bearer <api_key>, Idempotency-Key
                            → 202 { event_id, deliveries: 3 }
 
-GET    /v1/endpoints                    lista com taxa de sucesso 24h
-POST   /v1/endpoints                    cria e retorna o secret
-PATCH  /v1/endpoints/:id
-POST   /v1/endpoints/:id/enable         reativa após circuit breaker
+GET    /v1/applications/{id}/endpoints            lista com taxa de sucesso 24h
+POST   /v1/applications/{id}/endpoints            cria e retorna o secret
+PATCH  /v1/applications/{id}/endpoints/{ept_id}
+POST   /v1/applications/{id}/endpoints/{ept_id}/enable   reativa após circuit breaker
 GET    /v1/deliveries?status=&endpoint_id=&cursor=
 GET    /v1/deliveries/:id               detalhe + timeline de tentativas
 GET    /v1/deliveries/stream            SSE do feed
@@ -355,6 +372,8 @@ POST   /v1/deliveries/:id/replay        só quando status = dead
 GET    /v1/usage
 GET    /healthz  /readyz  /metrics
 ```
+
+**As rotas de management carregam o tenant no caminho** — ver §4.34, que revisou este bloco. As de `deliveries` acima ainda estão na forma plana e vão ser aninhadas pela spec que as implementar; a decisão já vale para elas.
 
 **Por quê.** Os dois têm perfis opostos — o ingress é público, quente e autenticado por chave de aplicação; o management é interno, frio e autenticado por token administrativo. A separação que importa é a de autenticação e a de contrato, e essa existe. Separar em dois processos só se paga quando os perfis de tráfego divergirem o suficiente para escalarem em ritmos diferentes.
 
@@ -537,6 +556,106 @@ Nullable porque `NULL` é o estado de payload expurgado pela retenção de 30 di
 **Tradeoff.** Perde-se indexação por conteúdo do payload — nada de índice GIN sobre um campo interno. Não é perda real: o vhook nunca consulta por dentro do payload, ele é opaco por definição. Se um dia fosse preciso, o caminho é uma coluna gerada com o campo específico extraído, não trocar o tipo da coluna.
 
 **Descartado.** `bytea`: igualmente byte-exato e mais honesto sobre ser opaco, mas aparece como hex no `psql` e mata a leitura manual do payload numa investigação — que é o uso mais frequente da coluna. `jsonb` mais `payload_raw bytea`: consulta rica e assinatura correta, ao custo de guardar o mesmo dado duas vezes, dobrando a tabela mais volumosa e criando duas fontes que podem divergir.
+
+### 4.33 Api key: `vhk_` + base62, com HMAC e pepper — nunca salt, nunca hash lento
+
+**Decisão.** A chave da application é `vhk_` seguido de 43 caracteres sorteados do alfabeto base62 com `crypto/rand`. Em `applications.api_key_hash` fica
+
+```
+HMAC-SHA256(VHOOK_MASTER_KEY, chave)
+```
+
+e o valor em claro existe apenas no instante em que é gerado. Exemplo da forma externa:
+
+```
+vhk_zDccFjpqVDQHpyWI9SskzezueMASw60LLuaLOFjmD8H
+```
+
+**43 caracteres porque `43 × log₂(62) = 256,0` bits.** O número vem do orçamento de entropia, não do gosto. E o sorteio é de caractere direto do alfabeto, com rejeição para não ter viés de módulo: base62 não é potência de dois, então converter 32 bytes exigiria aritmética de inteiro grande para nada.
+
+**Por que o prefixo.** `vhk_` torna a chave reconhecível num log, num ticket de suporte ou num `.env`, e é o que permite escrever uma regra de secret scanning depois. Base62 evita `+` e `/`, que quebram em URL e em variável de ambiente mal citada.
+
+#### Por que não hash lento
+
+O ingress verifica a chave em **toda** requisição do caminho quente. Duas coisas quebram com bcrypt ou argon2:
+
+**O índice deixa de existir.** Os dois salgam, então o mesmo segredo produz hashes diferentes, e `WHERE api_key_hash = $1` sobre o `UNIQUE` da coluna se torna impossível. A única forma de encontrar a linha seria carregar **todas** as applications e comparar uma a uma — O(n) por requisição, no lugar mais sensível do sistema.
+
+**O custo por verificação sai de ruído para dominante:**
+
+| | Por verificação |
+|---|---|
+| SHA-256 | ~0,4 µs |
+| HMAC-SHA256 | ~1 µs |
+| bcrypt custo 10 | 50–100 ms |
+| argon2id, parâmetros de 2024 | 50–200 ms + dezenas de MB de RAM |
+
+A 100 req/s, bcrypt consumiria de 5 a 10 núcleos apenas hasheando. §5 mira centenas de entregas por segundo num VPS modesto: seria queimar exatamente a folga pela qual o Go foi escolhido.
+
+E hash lento é **errado** aqui, não só caro. Bcrypt e argon2 existem para proteger **senha humana de baixa entropia** contra ataque de dicionário — o custo por tentativa é a defesa. Uma chave de 256 bits de `crypto/rand` não tem espaço de busca explorável, então alongar o cálculo não compra nada.
+
+#### Por que pepper e não salt
+
+Salt aleatório por linha resolveria um problema que aqui não existe, e criaria um que não temos como pagar.
+
+**O que salt defende:** rainbow table e ataque em lote contra hashes de segredos de **baixa entropia**. Funciona porque o espaço real de senha humana é de milhões de combinações. Contra 256 bits sorteados, não há dicionário nem tabela possível, e duas applications nunca colidem por coincidência.
+
+**O que salt custaria:** determinismo. Sem determinismo não há busca por índice — o mesmo problema do bcrypt, pela mesma razão.
+
+**O que salt não faz, e é o mal-entendido comum:** não protege contra **escrita** no banco. Quem consegue alterar `api_key_hash` escolhe uma chave, calcula o hash dela e grava — com ou sem salt, gerando o salt também se preciso. Nesse cenário o atacante já é dono da autenticação, e também de `endpoints.url` e de `plan`. A defesa é credencial de banco com menor privilégio e rede fechada, não formato de hash.
+
+**Pepper tem as três propriedades ao mesmo tempo:** é determinístico, então o índice continua valendo; é rápido, ~1 µs; e um dump de banco vazado passa a ser **inútil sozinho**, porque sem a chave mestra não há como nem confirmar se uma chave conhecida corresponde àquele hash.
+
+**Os ganhos, nomeados:**
+
+1. **Um dump de banco lido não vale nada para autenticação.** Sem pepper, um atacante que obtivesse uma chave candidata por outro caminho — `.env` vazado, log, commit — poderia confirmar com um único SHA-256 a qual application ela pertence.
+2. **O argumento de segurança encurta, e isso é o maior ganho.** Com pepper a afirmação é "um dump de banco sozinho é inútil para autenticação", ponto. Sem pepper seria "é seguro *porque* 2²⁵⁶ não se enumera *e porque* quem tem a chave em claro não precisa do hash" — verdadeiro, mas é raciocínio que alguém precisa reconstruir corretamente em cada review futuro. Invariante simples vale mais que invariante que depende de derivação certa.
+3. **Custo de desempenho de 0,6 µs**, contra uma query de Postgres de centenas de microssegundos na mesma requisição. O hash sai de 0,1% para 0,3% do tempo do request.
+4. **Nenhuma dependência nova.** `VHOOK_MASTER_KEY` já existe em §4.25 para o AES-GCM de `endpoints.secret`.
+
+Registrado com honestidade: o ganho **1** é estreito. Um atacante que já tenha a chave em claro pode simplesmente usá-la contra a API — não precisa do hash para nada, e o hash só lhe diria de qual tenant ela é, informação que usar a chave já entregaria. A troca se justifica porque o custo é próximo de zero, não porque o buraco fechado fosse grande.
+
+**Tradeoff, e o eixo real não é desempenho contra segurança — é acoplamento operacional contra segurança.** Rotacionar o pepper **invalida todas as api keys**, porque recalcular o HMAC exige o valor em claro, que não guardamos: rotação obriga a reemitir chave para todo tenant. E perder `VHOOK_MASTER_KEY` torna todas as chaves inverificáveis, então a autenticação de ingress passa a depender de um segredo de ambiente que antes ela não usava.
+
+Aceitável porque essa chave **já** é ponto único de falha: sem ela o AES-GCM não decifra o secret e nenhuma entrega é assinada (§4.12). Perdê-la já derruba o produto. A autenticação entrar nessa lista amplia o raio de dano, não muda a categoria dele.
+
+**Descartado.** Bcrypt e argon2, pelos dois motivos acima. Salt aleatório por linha, pelo mesmo motivo do bcrypt — quebra o índice — comprando uma defesa que 256 bits de entropia já dão. Prefixo com ambiente no estilo `vhk_live_` / `vhk_test_`: impediria usar chave de teste em produção, mas o vhook não tem noção de ambiente — demo e produção coexistem no mesmo deploy por decisão de §4.2, e inventar a distinção só para o prefixo é escopo que não se paga. Checksum no fim da chave, no estilo GitHub: o valor dele é detecção **offline** por scanner externo, e isso exige registrar o padrão no programa de parceiros do GitHub, o que um projeto sem usuários não tem como fazer; sem o registro compra apenas detecção de chave digitada errada, que o 401 já dá. Fica no roadmap, e adicionar depois é retrocompatível — a validação passa a ser "se tem checksum, verifica", e chaves antigas continuam valendo.
+
+**Guardar a chave em claro cifrada com AES-GCM**, como se faz com `endpoints.secret`, para permitir rotação de pepper sem reemissão: descartado por inverter a natureza da credencial. §4.12 separa as duas de propósito — a api key é *verificada* e por isso é hasheada; o secret do endpoint é *usado* e por isso é cifrado. Guardar a api key de forma recuperável a transformaria em algo que um dump vazado entrega em claro, que é exatamente o que hashear evita.
+
+**Consequência: `VHOOK_MASTER_KEY` tem rotação assimétrica.** A mesma chave protege as duas credenciais, de formas que se comportam de modo oposto na hora de trocá-la:
+
+| Credencial | Rotação da chave mestra |
+|---|---|
+| `endpoints.secret`, cifrado | **Sobrevive.** Decifra com a antiga, cifra com a nova. É um comando de `adminctl` |
+| `applications.api_key_hash`, HMAC | **Não sobrevive.** Recalcular exige o valor em claro, que não guardamos. Toda api key precisa ser reemitida |
+
+Não é defeito de nenhuma das duas: é a diferença entre cifrar e hashear aparecendo na operação. Vale registrar porque "rotacionar a chave mestra" soa como uma operação só e são duas, com custos muito diferentes — e a segunda envolve avisar todo cliente.
+
+### 4.34 Escopo de tenant explícito no caminho das rotas de management
+
+**Decisão.** Toda rota de management carrega o tenant no caminho, e não implícito na configuração nem num header:
+
+```
+/v1/applications/{application_id}/endpoints
+/v1/applications/{application_id}/endpoints/{endpoint_id}
+```
+
+Isso **substitui** a tabela de rotas de §4.21, que lista `/v1/endpoints` plano.
+
+**Por quê.** §4.14 promete que login é "plugável depois", e a promessa só se sustenta sob esta condição. Hoje existe uma organização só, então o escopo é implícito e ninguém sente falta. No dia em que houver usuários com acesso a N projetos, alguém precisa dizer *de qual projeto* cada requisição fala.
+
+Com o escopo no caminho, esse dia não toca a API Go: o BFF passa hoje o valor único que veio do bootstrap e amanhã o valor da sessão. Com escopo implícito, muda a assinatura de toda rota, cada handler, cada query, cada teste, o contrato, o código gerado e os tipos do front.
+
+**O custo em horas não é o argumento — a classe de bug é.** Uma rota que esquece o escopo devolve dado de outro tenant sem erro, sem log e sem sintoma. Com o escopo no caminho, esquecer é impossível: a URL não se constrói sem ele. Com parâmetro de query ou header, esquecer é possível, e o modo de falha é listar tudo.
+
+**Um efeito colateral que vale por si.** A query do detalhe passa a ser `WHERE id = $1 AND application_id = $2`, então pedir um recurso de outro tenant devolve **404**, não 403 — não confirma que o recurso existe. Autorização e existência deixam de ser distinguíveis de fora.
+
+**E resolve o "projeto atual".** Com um usuário tendo acesso a vários projetos, escopo implícito exigiria guardar o projeto selecionado na sessão — estado mutável escondido, que produz a classe de bug em que duas abas abertas em projetos diferentes passam a mostrar o mesmo. Com o escopo no caminho não há o que dessincronizar, e a URL do dashboard fica compartilhável e favoritável por projeto.
+
+**Tradeoff.** URLs mais longas, e um nível a mais de aninhamento em toda rota de management. Visões cross-project — "minhas entregas em todos os projetos" — não cabem numa rota aninhada e vão precisar de filtro em `/v1/deliveries`, na spec de entregas.
+
+**Descartado.** Escopo implícito vindo de configuração: é o que §4.14 sugeria, e só funciona enquanto houver um tenant. Header `X-Vhook-Application-Id`: explícito, mas esquecível, e header é lugar estranho para escopo de recurso. Parâmetro de query: funciona no `GET`, fica torto no `POST`, e mantém o "esquecer é possível".
 
 ---
 
