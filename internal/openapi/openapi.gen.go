@@ -4,11 +4,38 @@
 package openapi
 
 import (
+	"bytes"
+	"compress/flate"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
+	"strings"
+	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 )
+
+// Defines values for EndpointStatus.
+const (
+	Active   EndpointStatus = "active"
+	Disabled EndpointStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the EndpointStatus enum.
+func (e EndpointStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Disabled:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthStatus.
 const (
@@ -68,6 +95,71 @@ func (e ReadyChecksRabbitmq) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// ApplicationId Examples: app_01J4PMX3R0E008000000000002
+type ApplicationId = string
+
+// CreateEndpointRequest defines model for CreateEndpointRequest.
+type CreateEndpointRequest struct {
+	// Url Obrigatoriamente `https`. O destino é validado contra faixas
+	// privadas, loopback, link-local, CGNAT e os equivalentes IPv6,
+	// inclusive IPv4 mapeado.
+	//
+	// `http` fica de fora por ora: afrouxar depois não quebra nada,
+	// apertar depois quebraria todo endpoint já cadastrado.
+	//
+	//
+	// Examples: https://api.cliente.com/hooks
+	Url string `json:"url"`
+}
+
+// Endpoint defines model for Endpoint.
+type Endpoint struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// Id Examples: ept_01J4PMX3R0E008000000000003
+	Id EndpointId `json:"id"`
+
+	// Status `disabled` só é alcançável pelo circuit breaker, que ainda não existe.
+	// Nenhuma rota desta versão escreve neste campo.
+	Status EndpointStatus `json:"status"`
+
+	// Url Examples: https://api.cliente.com/hooks
+	Url string `json:"url"`
+}
+
+// EndpointId Examples: ept_01J4PMX3R0E008000000000003
+type EndpointId = string
+
+// EndpointList defines model for EndpointList.
+type EndpointList struct {
+	Endpoints []Endpoint `json:"endpoints"`
+}
+
+// EndpointStatus `disabled` só é alcançável pelo circuit breaker, que ainda não existe.
+// Nenhuma rota desta versão escreve neste campo.
+type EndpointStatus string
+
+// EndpointWithSecret defines model for EndpointWithSecret.
+type EndpointWithSecret struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// Id Examples: ept_01J4PMX3R0E008000000000003
+	Id EndpointId `json:"id"`
+
+	// Secret Chave do HMAC que o cliente usa para verificar a assinatura.
+	// Guardada cifrada com AES-GCM: o vhook precisa do valor em claro
+	// para assinar, então hasheá-la impossibilitaria a entrega (§4.12).
+	//
+	//
+	// Examples: whsec_zDccFjpqVDQHpyWI9SskzezueMASw60LLuaLOFjmD8H
+	Secret string `json:"secret"`
+
+	// Status `disabled` só é alcançável pelo circuit breaker, que ainda não existe.
+	// Nenhuma rota desta versão escreve neste campo.
+	Status EndpointStatus `json:"status"`
+	Url    string         `json:"url"`
 }
 
 // Error defines model for Error.
@@ -159,11 +251,25 @@ type ReadyChecksPostgres string
 // ReadyChecksRabbitmq defines model for ReadyChecks.Rabbitmq.
 type ReadyChecksRabbitmq string
 
+// UpdateEndpointRequest defines model for UpdateEndpointRequest.
+type UpdateEndpointRequest struct {
+	Url string `json:"url"`
+}
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
+
+// Conflict defines model for Conflict.
+type Conflict = Error
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
+
+// NotFound defines model for NotFound.
+type NotFound = Error
 
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = Error
@@ -177,6 +283,12 @@ type Unauthorized = Error
 // UnprocessableEntity defines model for UnprocessableEntity.
 type UnprocessableEntity = Error
 
+// CreateEndpointJSONRequestBody defines body for CreateEndpoint for application/json ContentType.
+type CreateEndpointJSONRequestBody = CreateEndpointRequest
+
+// UpdateEndpointJSONRequestBody defines body for UpdateEndpoint for application/json ContentType.
+type UpdateEndpointJSONRequestBody = UpdateEndpointRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetHealth Liveness
@@ -188,6 +300,18 @@ type ServerInterface interface {
 	// GetReadiness Readiness
 	// (GET /readyz)
 	GetReadiness(w http.ResponseWriter, r *http.Request)
+	// ListEndpoints Lista os endpoints de uma application
+	// (GET /v1/applications/{application_id}/endpoints)
+	ListEndpoints(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// CreateEndpoint Cadastra um endpoint
+	// (POST /v1/applications/{application_id}/endpoints)
+	CreateEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// GetEndpoint Detalha um endpoint, com o secret
+	// (GET /v1/applications/{application_id}/endpoints/{endpoint_id})
+	GetEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, endpointId EndpointId)
+	// UpdateEndpoint Altera a URL de um endpoint
+	// (PATCH /v1/applications/{application_id}/endpoints/{endpoint_id})
+	UpdateEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, endpointId EndpointId)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -209,6 +333,30 @@ func (_ Unimplemented) GetMetrics(w http.ResponseWriter, r *http.Request) {
 // GetReadiness Readiness
 // (GET /readyz)
 func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListEndpoints Lista os endpoints de uma application
+// (GET /v1/applications/{application_id}/endpoints)
+func (_ Unimplemented) ListEndpoints(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateEndpoint Cadastra um endpoint
+// (POST /v1/applications/{application_id}/endpoints)
+func (_ Unimplemented) CreateEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetEndpoint Detalha um endpoint, com o secret
+// (GET /v1/applications/{application_id}/endpoints/{endpoint_id})
+func (_ Unimplemented) GetEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, endpointId EndpointId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateEndpoint Altera a URL de um endpoint
+// (PATCH /v1/applications/{application_id}/endpoints/{endpoint_id})
+func (_ Unimplemented) UpdateEndpoint(w http.ResponseWriter, r *http.Request, applicationId ApplicationId, endpointId EndpointId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -254,6 +402,128 @@ func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadiness(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEndpoints operation middleware
+func (siw *ServerInterfaceWrapper) ListEndpoints(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", chi.URLParam(r, "application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEndpoints(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEndpoint operation middleware
+func (siw *ServerInterfaceWrapper) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", chi.URLParam(r, "application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEndpoint(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEndpoint operation middleware
+func (siw *ServerInterfaceWrapper) GetEndpoint(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", chi.URLParam(r, "application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "endpoint_id" -------------
+	var endpointId EndpointId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "endpoint_id", chi.URLParam(r, "endpoint_id"), &endpointId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endpoint_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEndpoint(w, r, applicationId, endpointId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateEndpoint operation middleware
+func (siw *ServerInterfaceWrapper) UpdateEndpoint(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", chi.URLParam(r, "application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "endpoint_id" -------------
+	var endpointId EndpointId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "endpoint_id", chi.URLParam(r, "endpoint_id"), &endpointId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endpoint_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateEndpoint(w, r, applicationId, endpointId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -385,6 +655,186 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/metrics", wrapper.GetMetrics)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/applications/{application_id}/endpoints", wrapper.ListEndpoints)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/applications/{application_id}/endpoints", wrapper.CreateEndpoint)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/applications/{application_id}/endpoints/{endpoint_id}", wrapper.GetEndpoint)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/applications/{application_id}/endpoints/{endpoint_id}", wrapper.UpdateEndpoint)
+	})
 
 	return r
+}
+
+// Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
+// Stored as a slice of fixed-width chunks rather than one concatenated
+// const string: with thousands of chunks the chained `+` fold is several
+// times slower for the Go compiler than parsing a slice literal.
+var swaggerSpec = []string{
+	"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",
+	"Xv1vAAAA//8=",
+}
+
+// decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
+// after base64-decoding and flate-decompressing the embedded blob.
+func decodeSpec() ([]byte, error) {
+	encoded := strings.Join(swaggerSpec, "")
+	compressed, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+	zr := flate.NewReader(bytes.NewReader(compressed))
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(zr); err != nil {
+		return nil, fmt.Errorf("read flate: %w", err)
+	}
+	if err := zr.Close(); err != nil {
+		return nil, fmt.Errorf("close flate reader: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var rawSpec = decodeSpecCached()
+
+// a naive cache of the decoded OpenAPI spec
+func decodeSpecCached() func() ([]byte, error) {
+	data, err := decodeSpec()
+	return func() ([]byte, error) {
+		return data, err
+	}
+}
+
+// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
+func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
+	res := make(map[string]func() ([]byte, error))
+	if len(pathToFile) > 0 {
+		res[pathToFile] = rawSpec
+	}
+
+	return res
+}
+
+// GetSpec returns the OpenAPI specification corresponding to the generated
+// code in this file. External references in the spec are resolved through
+// PathToRawSpec; externally-referenced files must be embedded in their
+// corresponding Go packages (via the import-mapping feature). URL-based
+// external refs are not supported.
+func GetSpec() (swagger *openapi3.T, err error) {
+	resolvePath := PathToRawSpec("")
+
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
+		pathToFile := url.String()
+		pathToFile = path.Clean(pathToFile)
+		getSpec, ok := resolvePath[pathToFile]
+		if !ok {
+			err1 := fmt.Errorf("path not found: %s", pathToFile)
+			return nil, err1
+		}
+		return getSpec()
+	}
+	var specData []byte
+	specData, err = rawSpec()
+	if err != nil {
+		return
+	}
+	swagger, err = loader.LoadFromData(specData)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// GetSpecJSON returns the raw JSON bytes of the embedded OpenAPI
+// specification: decompressed but not unmarshaled. External references
+// are not resolved here; the bytes are the spec exactly as embedded by
+// codegen. The result is cached at package init time, so repeated calls
+// are cheap.
+func GetSpecJSON() ([]byte, error) {
+	return rawSpec()
+}
+
+// GetSwagger returns the OpenAPI specification corresponding to the
+// generated code in this file.
+//
+// Deprecated: GetSwagger predates kin-openapi renaming openapi3.Swagger
+// to openapi3.T. Use [GetSpec] instead. This wrapper is retained for
+// backwards compatibility.
+func GetSwagger() (*openapi3.T, error) {
+	return GetSpec()
 }

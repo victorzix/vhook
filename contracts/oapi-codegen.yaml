@@ -5,4 +5,4 @@ output-options:
 generate:
   models: true
   chi-server: true
-  embedded-spec: false
+  embedded-spec: true
