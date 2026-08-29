@@ -9,13 +9,13 @@ package apikey
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 
 	"github.com/victorzix/vhook/internal/errs"
+	"github.com/victorzix/vhook/internal/tokens"
 )
 
 // Prefix makes a key recognisable in a log, a support ticket or a .env, and is
@@ -23,18 +23,9 @@ import (
 const Prefix = "vhk_"
 
 const (
-	// alphabet is Base62: no + or /, which break in URLs and in badly quoted
-	// environment variables.
-	alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
 	// keyLength is 43 because 43 × log2(62) = 256.0 bits. The number comes from
 	// the entropy budget, not from taste.
 	keyLength = 43
-
-	// maxUnbiased is the largest multiple of 62 that fits in a byte (62 × 4).
-	// Bytes at or above it are discarded rather than folded with %, which would
-	// make the first characters of the alphabet more likely.
-	maxUnbiased = 248
 
 	// masterKeyLength matches the AES-256 key already used for endpoint secrets.
 	masterKeyLength = 32
@@ -65,25 +56,10 @@ func NewHasher(masterKey []byte) (*Hasher, error) {
 // Generate returns a fresh key and its hash. The plaintext is returned once and
 // never stored anywhere.
 func (h *Hasher) Generate() (plain, hash string, err error) {
-	body := make([]byte, 0, keyLength)
-	buf := make([]byte, keyLength)
-
-	for len(body) < keyLength {
-		if _, err := rand.Read(buf); err != nil {
-			return "", "", fmt.Errorf("apikey: read random: %w", err)
-		}
-		for _, b := range buf {
-			if b >= maxUnbiased {
-				continue
-			}
-			body = append(body, alphabet[int(b)%len(alphabet)])
-			if len(body) == keyLength {
-				break
-			}
-		}
+	plain, err = tokens.Random(Prefix, keyLength)
+	if err != nil {
+		return "", "", err
 	}
-
-	plain = Prefix + string(body)
 	return plain, h.Hash(plain), nil
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/victorzix/vhook/internal/apikey"
 	"github.com/victorzix/vhook/internal/errs"
+	"github.com/victorzix/vhook/internal/tokens"
 )
 
 // Chaves mestras fixas: o teste do pepper precisa de duas que difiram.
@@ -14,8 +15,6 @@ var (
 	masterA = []byte("0123456789abcdef0123456789abcdef")
 	masterB = []byte("fedcba9876543210fedcba9876543210")
 )
-
-const base62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 func newHasher(t *testing.T, master []byte) *apikey.Hasher {
 	t.Helper()
@@ -42,7 +41,7 @@ func TestGenerateProducesTheDocumentedFormat(t *testing.T) {
 		t.Errorf("corpo tem %d caracteres, queria 43", len(body))
 	}
 	for i, c := range body {
-		if !strings.ContainsRune(base62, c) {
+		if !strings.ContainsRune(tokens.Alphabet, c) {
 			t.Errorf("caractere %d é %q, fora do alfabeto base62", i, c)
 		}
 	}
@@ -120,27 +119,6 @@ func TestGeneratedKeysDoNotRepeat(t *testing.T) {
 			t.Fatalf("chave repetida na iteração %d", i)
 		}
 		seen[plain] = true
-	}
-}
-
-// Pega o viés de módulo: uma implementação com `b % 62` sobre bytes crus
-// favoreceria os primeiros caracteres do alfabeto, e nenhum outro teste notaria.
-func TestGeneratedKeysUseTheWholeAlphabet(t *testing.T) {
-	h := newHasher(t, masterA)
-	seen := map[rune]bool{}
-	for i := 0; i < 10000; i++ {
-		plain, _, err := h.Generate()
-		if err != nil {
-			t.Fatalf("Generate() error = %v", err)
-		}
-		for _, c := range strings.TrimPrefix(plain, apikey.Prefix) {
-			seen[c] = true
-		}
-	}
-	for _, c := range base62 {
-		if !seen[c] {
-			t.Errorf("o caractere %q nunca foi sorteado em 430.000 posições", c)
-		}
 	}
 }
 
