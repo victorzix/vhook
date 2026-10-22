@@ -121,9 +121,12 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      # Pela .nvmrc, e não por um número solto aqui: o jsdom do Vitest carrega
+      # undici 8, que exige o zstd do Node — máquina e CI divergindo nisso dá
+      # erro de worker que não parece erro de versão.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

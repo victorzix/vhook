@@ -81,7 +81,7 @@ Herdadas por toda task. Não repetir dentro delas.
 **Interfaces:**
 - Produces: `@vhook/i18n` com `errorCatalogs`, `locales`, `type Locale`; e os quatro scripts que o CI espera em cada pacote — `typecheck`, `lint`, `test`, `build`.
 
-- [ ] **Step 1: Habilitar o pnpm**
+- [x] **Step 1: Habilitar o pnpm**
 
 `pnpm` não está no PATH. Node 22 traz o `corepack`, que é a forma menos invasiva:
 
@@ -92,7 +92,7 @@ pnpm --version
 
 Se `corepack` não estiver disponível, `npm i -g pnpm` resolve. **Reporte qual dos dois usou e a versão resultante** — ela vai para o `packageManager`.
 
-- [ ] **Step 2: Criar o workspace**
+- [x] **Step 2: Criar o workspace**
 
 `pnpm-workspace.yaml`:
 
@@ -114,7 +114,7 @@ packages:
 
 O `packageManager` não é enfeite: o `pnpm/action-setup` do CI o lê para escolher a versão, então sem ele o CI e a sua máquina podem divergir.
 
-- [ ] **Step 3: Tornar o catálogo de erros consumível pelo TS**
+- [x] **Step 3: Tornar o catálogo de erros consumível pelo TS**
 
 `i18n/package.json`:
 
@@ -169,7 +169,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Escrever o teste de paridade, e vê-lo falhar**
+- [x] **Step 4: Escrever o teste de paridade, e vê-lo falhar**
 
 Este é o teste que `apps/CLAUDE.md` exige. Escreva-o **antes** de conferir se os locales estão em paridade — se já estiverem, force o vermelho no Step 5.
 
@@ -215,7 +215,7 @@ pnpm install
 pnpm --filter @vhook/i18n test
 ```
 
-- [ ] **Step 5: Provar que o teste de paridade pega a falta**
+- [x] **Step 5: Provar que o teste de paridade pega a falta**
 
 Remova temporariamente uma chave de `i18n/errors.fr.json` e rode de novo.
 
@@ -223,7 +223,7 @@ Esperado: FAIL com `locale fr divergiu de pt-BR`. **Restaure a chave e rode até
 
 Um teste de paridade que nunca foi visto vermelho não prova que pega a divergência — e este projeto já teve a versão Go dele pagar três vezes.
 
-- [ ] **Step 6: Criar o app**
+- [x] **Step 6: Criar o app**
 
 ```bash
 pnpm create next-app@latest apps/dashboard \
@@ -240,7 +240,7 @@ pnpm --filter dashboard add -D vitest @vitejs/plugin-react jsdom @testing-librar
 
 `framer-motion` **não** entra: nenhuma animação nesta release, e biblioteca sem uso decide a forma antes de existir o problema.
 
-- [ ] **Step 7: Dar ao app os quatro scripts que o CI espera**
+- [x] **Step 7: Dar ao app os quatro scripts que o CI espera**
 
 Em `apps/dashboard/package.json`, o bloco `scripts` precisa conter exatamente estes nomes — o CI roda `pnpm -r typecheck`, `lint`, `test` e `build`:
 
@@ -304,7 +304,7 @@ Acrescente a dependência de workspace:
 pnpm --filter dashboard add @vhook/i18n --workspace
 ```
 
-- [ ] **Step 8: Verificar que os quatro comandos do CI passam**
+- [x] **Step 8: Verificar que os quatro comandos do CI passam**
 
 ```bash
 pnpm install --frozen-lockfile

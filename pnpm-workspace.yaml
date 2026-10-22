@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "i18n"
+
+# pnpm não roda postinstall de dependência sem aprovação explícita. Sem esta
+# lista o install falha com ERR_PNPM_IGNORED_BUILDS — aqui e no CI. Só entra o
+# que precisa de binário nativo baixado na instalação.
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  esbuild: true
+  # Negados pelo próprio create-next-app: o Next não precisa de nenhum dos dois
+  # no caminho que usamos, e são os dois mais pesados da árvore.
+  sharp: false
+  unrs-resolver: false
