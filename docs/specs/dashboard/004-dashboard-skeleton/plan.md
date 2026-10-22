@@ -339,7 +339,7 @@ feat: criar o workspace pnpm e o app do dashboard
 **Interfaces:**
 - Produces: `import type { components } from "@/lib/api-types"` — os tipos do contrato.
 
-- [ ] **Step 1: Acrescentar a geração ao alvo**
+- [x] **Step 1: Acrescentar a geração ao alvo**
 
 A restrição que decide a forma: **`make generate` roda no job Go do CI**, que não faz `pnpm install`. Então a geração não pode depender de `node_modules`.
 
@@ -354,7 +354,7 @@ generate:
 
 Confirme que `7.9.1` existe e ajuste para a versão estável que o `npx` resolver. **Reporte a versão que ficou.**
 
-- [ ] **Step 2: Gerar e ler o que saiu**
+- [x] **Step 2: Gerar e ler o que saiu**
 
 ```bash
 npx --yes openapi-typescript@<versão> contracts/openapi.yaml -o apps/dashboard/src/lib/api-types.ts
@@ -367,7 +367,7 @@ npx --yes openapi-typescript@<versão> contracts/openapi.yaml -o apps/dashboard/
 
 **Nunca edite o gerado.**
 
-- [ ] **Step 3: Verificar que o typecheck aceita o gerado**
+- [x] **Step 3: Verificar que o typecheck aceita o gerado**
 
 ```bash
 pnpm -r typecheck
@@ -375,7 +375,7 @@ pnpm -r typecheck
 
 Esperado: sem erro.
 
-- [ ] **Step 4: Verificar que regerar é estável**
+- [x] **Step 4: Verificar que regerar é estável**
 
 ```bash
 npx --yes openapi-typescript@<versão> contracts/openapi.yaml -o apps/dashboard/src/lib/api-types.ts

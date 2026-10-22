@@ -10,9 +10,13 @@ down:
 run:
 	go run ./cmd/api
 
+## generate: o CI roda este alvo no job Go, que não faz `pnpm install` — por
+## isso a geração do TS vai por npx, e com versão fixada: versão flutuante
+## deixaria o `git diff --exit-code` do CI vermelho por motivo errado.
 generate:
 	go tool sqlc generate
 	go tool oapi-codegen -config contracts/oapi-codegen.yaml contracts/openapi.yaml
+	npx --yes openapi-typescript@7.13.0 contracts/openapi.yaml -o apps/dashboard/src/lib/api-types.ts
 
 ## lint: o mesmo golangci-lint que o CI roda, compilado pelo toolchain do repo
 lint:
