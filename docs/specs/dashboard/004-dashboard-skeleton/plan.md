@@ -833,7 +833,7 @@ Onde o ciclo red-green vive, sem React e sem DOM. É o `internal/core` do front.
   - `messageForErrorCode(code: string, locale: Locale): string`
   - `createEndpointSchema` (zod)
 
-- [ ] **Step 1: Escrever os testes do mascaramento**
+- [x] **Step 1: Escrever os testes do mascaramento**
 
 `apps/dashboard/src/features/endpoints/lib/secret.test.ts`:
 
@@ -871,7 +871,7 @@ describe("maskSecret", () => {
 });
 ```
 
-- [ ] **Step 2: Rodar para ver falhar**
+- [x] **Step 2: Rodar para ver falhar**
 
 ```bash
 pnpm --filter dashboard test
@@ -879,7 +879,7 @@ pnpm --filter dashboard test
 
 Esperado: FAIL, `Failed to resolve import "./secret"`.
 
-- [ ] **Step 3: Implementar o mascaramento**
+- [x] **Step 3: Implementar o mascaramento**
 
 `apps/dashboard/src/features/endpoints/lib/secret.ts`:
 
@@ -901,7 +901,7 @@ export function maskSecret(secret: string): string {
 }
 ```
 
-- [ ] **Step 4: Rodar para ver passar**
+- [x] **Step 4: Rodar para ver passar**
 
 ```bash
 pnpm --filter dashboard test
@@ -909,7 +909,7 @@ pnpm --filter dashboard test
 
 Esperado: PASS nos cinco.
 
-- [ ] **Step 5: Escrever os testes do mapeamento de erro**
+- [x] **Step 5: Escrever os testes do mapeamento de erro**
 
 `apps/dashboard/src/features/endpoints/lib/errors.test.ts`:
 
@@ -968,11 +968,11 @@ describe("messageForErrorCode", () => {
 });
 ```
 
-- [ ] **Step 6: Rodar para ver falhar**
+- [x] **Step 6: Rodar para ver falhar**
 
 Esperado: FAIL, `Failed to resolve import "./errors"`.
 
-- [ ] **Step 7: Implementar o mapeamento**
+- [x] **Step 7: Implementar o mapeamento**
 
 `apps/dashboard/src/features/endpoints/lib/errors.ts`:
 
@@ -1009,11 +1009,11 @@ export function messageForErrorCode(code: string, locale: Locale): string {
 }
 ```
 
-- [ ] **Step 8: Rodar para ver passar**
+- [x] **Step 8: Rodar para ver passar**
 
 Esperado: PASS nos oito.
 
-- [ ] **Step 9: Escrever o schema zod e seus testes**
+- [x] **Step 9: Escrever o schema zod e seus testes**
 
 `apps/dashboard/src/features/endpoints/schemas/endpoint.test.ts`:
 
@@ -1043,7 +1043,7 @@ describe("createEndpointSchema", () => {
 });
 ```
 
-- [ ] **Step 10: Rodar para ver falhar, implementar, rodar para ver passar**
+- [x] **Step 10: Rodar para ver falhar, implementar, rodar para ver passar**
 
 `apps/dashboard/src/features/endpoints/schemas/endpoint.ts`:
 
