@@ -548,7 +548,7 @@ feat: montar i18n e providers do dashboard
 - Consumes: `@/lib/api-types`
 - Produces: as quatro rotas do BFF; `mockStore` com `list`, `create`, `get`, `updateUrl`.
 
-- [ ] **Step 1: Escrever o README da remoção**
+- [x] **Step 1: Escrever o README da remoção**
 
 Escreva **primeiro**, enquanto o contexto está fresco. Instrução de remoção escrita depois nunca é escrita.
 
@@ -581,7 +581,7 @@ o BFF falar com a API de verdade, quem alcançar a URL revela secret de
 assinatura real. Basic auth no proxy do Coolify resolve — ver a spec 004.
 ```
 
-- [ ] **Step 2: Escrever os fixtures, tipados pelo contrato**
+- [x] **Step 2: Escrever os fixtures, tipados pelo contrato**
 
 `apps/dashboard/src/mocks/fixtures/endpoints.ts`:
 
@@ -615,7 +615,7 @@ export const planLimit = 2;
 
 Ajuste `components["schemas"][...]` ao que a Task 2 anotou.
 
-- [ ] **Step 3: Escrever o estado em memória**
+- [x] **Step 3: Escrever o estado em memória**
 
 `apps/dashboard/src/mocks/store.ts`:
 
@@ -710,7 +710,7 @@ export const mockStore = {
 };
 ```
 
-- [ ] **Step 4: Escrever os route handlers**
+- [x] **Step 4: Escrever os route handlers**
 
 `apps/dashboard/src/app/api/endpoints/route.ts`:
 
@@ -788,7 +788,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 **A assinatura de `params` mudou entre versões maiores do Next** — em 15 é `Promise`. Confira na versão instalada e adapte, reportando.
 
-- [ ] **Step 5: Verificar**
+- [x] **Step 5: Verificar**
 
 ```bash
 pnpm -r typecheck && pnpm -r lint && pnpm -r build
