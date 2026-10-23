@@ -2,11 +2,11 @@
 
 Webhook dispatcher: recebe eventos, enfileira e entrega em endpoints HTTP cadastrados, com assinatura HMAC, timeout agressivo, retry com backoff exponencial e DLQ.
 
-**Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md), [002](docs/specs/platform/002-tenancy-bootstrap/spec.md) e [003](docs/specs/endpoints/003-endpoint-registration/spec.md) implementadas.** A `api` sobe com migrations no boot, `/healthz`, `/readyz` e `/metrics` respondem, o `adminctl` cria a primeira organização e application com api key utilizável, e as rotas de cadastro de endpoint estão de pé — com secret cifrado, validação de SSRF e autenticação de management vinda do contrato.
+**Estado: specs [001](docs/specs/platform/001-walking-skeleton/spec.md), [002](docs/specs/platform/002-tenancy-bootstrap/spec.md), [003](docs/specs/endpoints/003-endpoint-registration/spec.md) e [004](docs/specs/dashboard/004-dashboard-skeleton/spec.md) implementadas.** A `api` sobe com migrations no boot, `/healthz`, `/readyz` e `/metrics` respondem, o `adminctl` cria a primeira organização e application com api key utilizável, e as rotas de cadastro de endpoint estão de pé — com secret cifrado, validação de SSRF e autenticação de management vinda do contrato. O `apps/dashboard` roda com a tela de Endpoints, e o job de front do CI saiu do silêncio.
 
-Em revisão: **[spec 004](docs/specs/dashboard/004-dashboard-skeleton/spec.md) — esqueleto do dashboard**, com a tela de Endpoints contra BFF mockado. Sem conexão com a API ainda: os fixtures são tipados pelo contrato, e conectar vira spec própria.
+O dashboard **ainda não fala com a API**: o BFF devolve fixture tipado pelo contrato. Conectar é spec própria, e é ela que traz o gate de acesso.
 
-Depois dela: **`ingress` — recebimento de evento**, que já tem tudo de que precisa — application para autenticar e endpoint para o qual gerar `deliveries`.
+Próxima: **`ingress` — recebimento de evento**, que já tem tudo de que precisa — application para autenticar e endpoint para o qual gerar `deliveries`.
 
 Pendente: CD no Coolify apontando para o repo · topologia RabbitMQ e a constante de shards (spec de `queue`) · painel Prometheus e Grafana (spec de `platform`) · republicar `docs/overview.html` como Artifact — o HTML já está atualizado, falta publicar · opcionalmente hooks em `settings.json` para transformar "não encerrar com teste vermelho" e "quem commita é o dono" de lembrete em barreira.
 
@@ -175,5 +175,12 @@ Secrets usados pelo release, ambos opcionais: `VHOOK_INGRESS_URL` e `VHOOK_INGRE
 | `make test` | só unidade, com `-short` |
 | `make test-integration` | tudo, subindo container de verdade |
 | `make test-race` | o que o CI roda; exige `CGO_ENABLED=1` e um compilador C |
+| `pnpm install` | instala o workspace; exige pnpm e o Node da `.nvmrc` |
+| `pnpm --filter dashboard dev` | sobe o dashboard em `localhost:3000`, com BFF mockado |
+| `pnpm -r test` | testes do front |
+
+O dashboard desta release **não fala com a API**: o BFF devolve fixture, e os
+dados são inventados. Conectar é spec própria — e é ela que traz o gate de
+acesso, porque a tela aberta com dado real expõe secret de assinatura.
 
 Copie `.env.example` para `.env` antes do primeiro `make run`. A `api` não sobe sem `VHOOK_MASTER_KEY` e `VHOOK_ADMIN_TOKEN`: ela sai com `CFG-VAL-001` antes de abrir a porta.

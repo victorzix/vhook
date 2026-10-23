@@ -1607,7 +1607,7 @@ feat: criar a tela de endpoints
 **Interfaces:**
 - Consumes: tudo.
 
-- [ ] **Step 1: Escrever o teste que mantém a promessa da remoção**
+- [x] **Step 1: Escrever o teste que mantém a promessa da remoção**
 
 `apps/dashboard/src/mocks/isolation.test.ts`:
 
@@ -1653,7 +1653,7 @@ describe("isolamento dos mocks", () => {
 });
 ```
 
-- [ ] **Step 2: Provar que o teste pega a violação**
+- [x] **Step 2: Provar que o teste pega a violação**
 
 Acrescente temporariamente `import { mockStore } from "@/mocks/store";` em `src/features/endpoints/api/client.ts` e rode:
 
@@ -1663,7 +1663,7 @@ pnpm --filter dashboard test -- isolation
 
 Esperado: FAIL listando `features/endpoints/api/client.ts`. **Remova o import e rode até verde.**
 
-- [ ] **Step 3: Atualizar a tabela de comandos**
+- [x] **Step 3: Atualizar a tabela de comandos**
 
 Em `CLAUDE.md`, na tabela `## Comandos`, acrescente:
 
@@ -1681,7 +1681,7 @@ dados são inventados. Conectar é spec própria — e é ela que traz o gate de
 acesso, porque a tela aberta com dado real expõe secret de assinatura.
 ```
 
-- [ ] **Step 4: Verificação manual completa**
+- [x] **Step 4: Verificação manual completa**
 
 ```bash
 pnpm --filter dashboard dev
@@ -1699,7 +1699,7 @@ Na tela, em `localhost:3000/endpoints`:
 
 Capture as saídas e diga o que não conseguiu exercitar.
 
-- [ ] **Step 5: Suíte completa**
+- [x] **Step 5: Suíte completa**
 
 ```bash
 pnpm install --frozen-lockfile
@@ -1730,7 +1730,7 @@ Este é o `feat:` que corta a `v0.4.0`.
 
 ## Encerramento da spec
 
-- [ ] **Escrever o `result.md`** com o template de `docs/specs/_template_/result.md`.
+- [x] **Escrever o `result.md`** com o template de `docs/specs/_template_/result.md`.
 
 Candidatos prováveis de divergência, porque o plano os assume sem poder verificar:
 
@@ -1740,4 +1740,4 @@ Candidatos prováveis de divergência, porque o plano os assume sem poder verifi
 - se `vitest run` sem teste algum falha em `apps/dashboard` no Step 8 da Task 1;
 - se o `shadcn init` aceita o layout com `src-dir` sem ajuste manual.
 
-- [ ] **Atualizar o índice** em `docs/specs/README.md`: status da 004 para `implementada`.
+- [x] **Atualizar o índice** em `docs/specs/README.md`: status da 004 para `implementada`.

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
@@ -15,9 +16,12 @@ const endpoints = [
 ];
 
 function renderList(items = endpoints) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <NextIntlClientProvider locale="pt-BR" messages={messages}>
-      <EndpointList endpoints={items} />
+      <QueryClientProvider client={client}>
+        <EndpointList endpoints={items} />
+      </QueryClientProvider>
     </NextIntlClientProvider>,
   );
 }
