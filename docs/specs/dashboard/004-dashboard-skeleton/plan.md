@@ -1099,7 +1099,7 @@ feat: mascarar secret e traduzir erro pelo catálogo
 **Interfaces:**
 - Consumes: tudo da Task 5, mais os route handlers da Task 4.
 
-- [ ] **Step 1: Instalar os componentes shadcn que a tela usa**
+- [x] **Step 1: Instalar os componentes shadcn que a tela usa**
 
 ```bash
 pnpm --filter dashboard dlx shadcn@latest init
@@ -1108,7 +1108,7 @@ pnpm --filter dashboard dlx shadcn@latest add button input form card table badge
 
 Eles são **copiados para dentro do app**, não importados de biblioteca. Ficam em `apps/dashboard/src/components/ui/` — e é por isso que `packages/ui` não precisa existir ainda: mover depois é `git mv`.
 
-- [ ] **Step 2: Escrever o cliente do BFF**
+- [x] **Step 2: Escrever o cliente do BFF**
 
 `apps/dashboard/src/features/endpoints/api/client.ts`:
 
@@ -1164,7 +1164,7 @@ export async function updateEndpointUrl(id: string, url: string): Promise<Endpoi
 }
 ```
 
-- [ ] **Step 3: Escrever os hooks**
+- [x] **Step 3: Escrever os hooks**
 
 `apps/dashboard/src/features/endpoints/hooks/use-endpoints.ts`:
 
@@ -1198,7 +1198,7 @@ export function useUpdateEndpointUrl() {
 }
 ```
 
-- [ ] **Step 4: Escrever o teste de componente do formulário**
+- [x] **Step 4: Escrever o teste de componente do formulário**
 
 `apps/dashboard/src/app/(dashboard)/endpoints/_components/endpoint-form.test.tsx`:
 
@@ -1244,11 +1244,11 @@ describe("EndpointForm", () => {
 });
 ```
 
-- [ ] **Step 5: Rodar para ver falhar**
+- [x] **Step 5: Rodar para ver falhar**
 
 Esperado: FAIL, `Failed to resolve import "./endpoint-form"`.
 
-- [ ] **Step 6: Implementar o formulário**
+- [x] **Step 6: Implementar o formulário**
 
 `_components/endpoint-form.tsx`:
 
@@ -1346,11 +1346,11 @@ Repare em duas coisas que a regra do projeto exige e que é fácil errar: **`pla
 
 O `isPlanLimitError` é usado pela página, não pelo formulário: é ela que sabe quantos endpoints existem. Ver o Step 9.
 
-- [ ] **Step 7: Rodar para ver passar**
+- [x] **Step 7: Rodar para ver passar**
 
 Esperado: PASS nos dois.
 
-- [ ] **Step 8: Escrever o teste do secret revelável**
+- [x] **Step 8: Escrever o teste do secret revelável**
 
 `_components/endpoint-secret.test.tsx`:
 
@@ -1394,7 +1394,7 @@ describe("EndpointSecret", () => {
 });
 ```
 
-- [ ] **Step 9: Implementar `EndpointSecret`, e ver passar**
+- [x] **Step 9: Implementar `EndpointSecret`, e ver passar**
 
 `_components/endpoint-secret.tsx`:
 
@@ -1433,7 +1433,7 @@ export function EndpointSecret({ secret }: { secret: string }) {
 
 O ícone leva `aria-hidden` porque o texto do botão já nomeia a ação — sem isso o leitor de tela anuncia duas vezes.
 
-- [ ] **Step 10: Escrever o teste da listagem, e vê-lo falhar**
+- [x] **Step 10: Escrever o teste da listagem, e vê-lo falhar**
 
 `_components/endpoint-list.test.tsx`:
 
@@ -1485,7 +1485,7 @@ describe("EndpointList", () => {
 
 Rode e veja falhar com `Failed to resolve import "./endpoint-list"`.
 
-- [ ] **Step 11: Implementar a lista e a página, e ver passar**
+- [x] **Step 11: Implementar a lista e a página, e ver passar**
 
 `_components/endpoint-list.tsx`:
 
@@ -1578,7 +1578,7 @@ export function EndpointsScreen() {
 
 O layout é **mobile first**: o estilo base é o de tela pequena, e `max-w-2xl` só limita a largura acima disso.
 
-- [ ] **Step 12: Verificar tudo**
+- [x] **Step 12: Verificar tudo**
 
 ```bash
 pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm -r build
