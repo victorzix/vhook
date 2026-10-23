@@ -1,0 +1,22 @@
+{
+  "endpoints": {
+    "title": "Endpoints",
+    "empty": "Todavía no hay endpoints registrados.",
+    "urlLabel": "URL de destino",
+    "urlPlaceholder": "https://api.suempresa.com/webhooks",
+    "create": "Registrar endpoint",
+    "creating": "Registrando…",
+    "secretLabel": "Secreto de firma",
+    "reveal": "Mostrar secreto",
+    "hide": "Ocultar secreto",
+    "copy": "Copiar secreto",
+    "copied": "Copiado",
+    "edit": "Corregir URL",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "status": { "active": "Activo", "disabled": "Desactivado" },
+    "createdAt": "Registrado el",
+    "urlMustBeHttps": "La dirección debe empezar por https://",
+    "unknownError": "No se pudo completar. Inténtalo de nuevo."
+  }
+}

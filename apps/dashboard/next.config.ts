@@ -1,6 +1,11 @@
 import path from "node:path";
 
+import createNextIntlPlugin from "next-intl/plugin";
+
 import type { NextConfig } from "next";
+
+// Sem argumento, o plugin acha `src/i18n/request.ts` sozinho.
+const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   // §4.35: sem depender de nada da Vercel. §3 fixa deploy em VPS com Coolify.
@@ -22,4 +27,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

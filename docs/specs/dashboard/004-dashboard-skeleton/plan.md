@@ -407,7 +407,7 @@ feat: gerar os tipos TS a partir do contrato
 - Consumes: `@vhook/i18n`
 - Produces: `useTranslations` disponível na árvore; `QueryClientProvider` montado.
 
-- [ ] **Step 1: Escrever as mensagens de interface nos quatro locales**
+- [x] **Step 1: Escrever as mensagens de interface nos quatro locales**
 
 São **duas** famílias de texto, e confundi-las é o erro comum:
 
@@ -443,7 +443,7 @@ São **duas** famílias de texto, e confundi-las é o erro comum:
 
 Traduza as **mesmas chaves** para `en.json`, `es.json` e `fr.json`. Chave nova nos quatro no mesmo commit — sem exceção, e sem fallback.
 
-- [ ] **Step 2: Estender o teste de paridade para as mensagens de interface**
+- [x] **Step 2: Estender o teste de paridade para as mensagens de interface**
 
 Em `apps/dashboard`, crie `src/i18n/messages.test.ts`:
 
@@ -479,7 +479,7 @@ pnpm --filter dashboard test
 
 Esperado: PASS. Depois remova temporariamente uma chave de `fr.json`, rode de novo e **veja falhar**, então restaure. É o mesmo argumento do Step 5 da Task 1.
 
-- [ ] **Step 3: Configurar o `next-intl`**
+- [x] **Step 3: Configurar o `next-intl`**
 
 `apps/dashboard/src/i18n/request.ts`:
 
@@ -498,7 +498,7 @@ export default getRequestConfig(async () => ({
 
 Siga a documentação do `next-intl` para o plugin em `next.config.ts`. **Confira a forma na versão instalada e reporte se divergir** — a API do `next-intl` mudou entre versões maiores.
 
-- [ ] **Step 4: Montar os providers**
+- [x] **Step 4: Montar os providers**
 
 `apps/dashboard/src/app/providers.tsx`:
 
@@ -518,7 +518,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
 Envolva o `children` do `layout.tsx` com `Providers` e com o `NextIntlClientProvider`.
 
-- [ ] **Step 5: Verificar**
+- [x] **Step 5: Verificar**
 
 ```bash
 pnpm -r typecheck && pnpm -r lint && pnpm -r test && pnpm -r build
